@@ -1,0 +1,1799 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Noise Check">
+<meta name="theme-color" content="#ECEFF0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1316" media="(prefers-color-scheme: dark)">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+</head>
+<body>
+<title>Neighbor Noise Check</title>
+<meta name="description" content="Estimate how much neighbor noise you'll hear in an apartment, from its construction and from phone measurements.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+/* Layout: one narrow instrument column (max 560px), summary above inputs, fixed bottom tab bar.
+   Readouts in a condensed display face, labels in mono like a sound level meter. */
+:root{
+  --bg:#ECEFF0;
+  --surface:#FFFFFF;
+  --surface-2:#F4F6F7;
+  --ink:#13212A;
+  --muted:#56656D;
+  --line:#D3DADD;
+  --accent:#1D6A64;
+  --accent-ink:#FFFFFF;
+  --accent-soft:#D9ECE9;
+  --good:#276B42; --good-soft:#DFF0E5;
+  --ok:#765C08;   --ok-soft:#F3EBCF;
+  --warn:#9E4A12; --warn-soft:#F7E3D3;
+  --bad:#B03535;  --bad-soft:#F5DCDC;
+  --shadow:0 6px 20px rgba(19,33,42,.10);
+  --font-display:"Barlow Condensed","Arial Narrow","Roboto Condensed",sans-serif;
+  --font-body:"Source Sans 3",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --radius:12px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1316; --surface:#151E23; --surface-2:#1C272D; --ink:#E2E9EC; --muted:#97A6AD; --line:#29383F;
+    --accent:#5CB3A9; --accent-ink:#06201D; --accent-soft:#17332F;
+    --good:#62C78C; --good-soft:#15301F; --ok:#D8B64B; --ok-soft:#30290F;
+    --warn:#EC9A5E; --warn-soft:#38230F; --bad:#F27E7E; --bad-soft:#3A1818;
+    --shadow:0 6px 20px rgba(0,0,0,.45);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1316; --surface:#151E23; --surface-2:#1C272D; --ink:#E2E9EC; --muted:#97A6AD; --line:#29383F;
+  --accent:#5CB3A9; --accent-ink:#06201D; --accent-soft:#17332F;
+  --good:#62C78C; --good-soft:#15301F; --ok:#D8B64B; --ok-soft:#30290F;
+  --warn:#EC9A5E; --warn-soft:#38230F; --bad:#F27E7E; --bad-soft:#3A1818;
+  --shadow:0 6px 20px rgba(0,0,0,.45);
+  color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 var(--font-body)}
+button,input,textarea,select{font:inherit;color:inherit}
+p{margin:0}
+h1,h2,h3{margin:0;text-wrap:balance}
+h1{font:600 27px/1.02 var(--font-display);letter-spacing:.005em}
+h2{font:600 23px/1.1 var(--font-display);letter-spacing:.005em}
+h3{font:600 18px/1.2 var(--font-display);letter-spacing:.01em}
+a{color:var(--accent);text-underline-offset:3px}
+.small{font-size:14px;line-height:1.45}
+.muted{color:var(--muted)}
+.eyebrow{font:500 11px/1.2 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;padding:0;margin:-1px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:14px calc(96px + env(safe-area-inset-bottom,0px))}
+.top{display:flex;align-items:center;gap:12px;padding-block:4px 16px}
+.logo{width:42px;height:42px;flex:none}
+.top p{color:var(--muted);font-size:14px;line-height:1.3;margin-top:3px}
+
+.tab{display:grid;gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;display:grid;gap:14px;min-width:0}
+.row-between{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+/* pills and tones */
+.pill{display:inline-flex;align-items:center;gap:6px;font:600 13px/1.1 var(--font-body);padding:6px 10px;border-radius:999px;background:var(--surface-2);color:var(--ink);white-space:nowrap;border:0}
+button.pill{cursor:pointer}
+.tone-good{background:var(--good-soft);color:var(--good)}
+.tone-ok{background:var(--ok-soft);color:var(--ok)}
+.tone-warn{background:var(--warn-soft);color:var(--warn)}
+.tone-bad{background:var(--bad-soft);color:var(--bad)}
+.tone-info{background:var(--accent-soft);color:var(--accent)}
+
+/* buttons */
+.btn{appearance:none;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);font:600 15px/1 var(--font-body);padding:12px 16px;border-radius:10px;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn.secondary{background:transparent;color:var(--accent)}
+.btn.danger,.btn.recording{background:var(--bad);border-color:var(--bad);color:var(--surface)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.linkbtn{appearance:none;background:none;border:0;color:var(--accent);font:600 14px/1.2 var(--font-body);text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:8px 0}
+
+/* chips and tiles */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{appearance:none;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);font:600 14px/1.2 var(--font-body);padding:9px 13px;border-radius:999px;cursor:pointer;min-height:40px;text-align:left}
+.chips.sm .chip{font-size:13px;padding:7px 11px;min-height:34px}
+.chip[aria-checked="true"],.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip:disabled{opacity:.45;cursor:not-allowed}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.tile{appearance:none;display:flex;gap:10px;align-items:flex-start;text-align:left;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:10px;padding:10px;cursor:pointer;min-height:64px;min-width:0}
+.tile svg{width:30px;height:30px;flex:none;color:var(--accent)}
+.tile b{display:block;font:600 14px/1.2 var(--font-body)}
+.tile small{display:block;font-size:12.5px;line-height:1.3;color:var(--muted);margin-top:2px}
+.tile[aria-checked="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.g-line{fill:none;stroke:currentColor;stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+.g-dot{fill:currentColor}
+
+/* questions */
+.qsec{display:grid;gap:18px;padding-top:16px;border-top:1px solid var(--line)}
+.qsec:first-child{border-top:0;padding-top:0}
+.q{display:grid;gap:8px;min-width:0}
+.q-label{font:600 16px/1.3 var(--font-body)}
+.q-help{font-size:14px;line-height:1.4;color:var(--muted);margin-top:-4px}
+.form-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+
+/* result summary */
+.result-top{display:flex;align-items:center;gap:16px}
+.score{display:grid;gap:2px}
+.score-num{font:700 64px/0.9 var(--font-display);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.score-den{font:500 20px/1 var(--font-display);color:var(--muted);margin-left:2px}
+.verdict{display:grid;gap:6px;justify-items:start;min-width:0}
+.scale-block{display:grid;gap:2px;padding-top:14px;border-top:1px solid var(--line)}
+.scale-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.scale-name{font:600 16px/1.2 var(--font-body)}
+.scale-val{font:600 20px/1 var(--font-display);font-variant-numeric:tabular-nums;white-space:nowrap}
+.scale-track{position:relative;height:12px;border-radius:6px;margin-block:24px 4px}
+.scale-range{position:absolute;top:-5px;bottom:-5px;min-width:10px;border-radius:8px;border:2.5px solid var(--ink);background:transparent;background:color-mix(in srgb,var(--ink) 14%,transparent)}
+.scale-ref{position:absolute;top:-7px;bottom:-7px;width:0;border-left:1.5px dashed var(--muted)}
+.scale-ref i{position:absolute;bottom:100%;left:0;transform:translateX(-50%);font:500 10px/1 var(--font-mono);color:var(--muted);white-space:nowrap;font-style:normal;padding-bottom:3px;letter-spacing:.05em;text-transform:uppercase}
+.scale-marker{position:absolute;top:50%;width:13px;height:13px;background:var(--accent);border:2px solid var(--surface);transform:translate(-50%,-50%) rotate(45deg)}
+.scale-ticks{position:relative;height:14px;font:400 11px/1 var(--font-mono);color:var(--muted);margin-inline:2px}
+.scale-ticks span{position:absolute;transform:translateX(-50%)}
+.scale-text{font-size:14.5px;line-height:1.45;margin-top:6px}
+.scale-none{font-size:14.5px;color:var(--good);font-weight:600;margin-top:6px}
+
+/* hearing table */
+.hear{display:grid;gap:10px;padding-top:14px;border-top:1px solid var(--line)}
+.hear-rows{display:grid}
+.hear-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-block:7px;border-bottom:1px solid var(--line);font-size:15px}
+.hear-row:last-child{border-bottom:0}
+.hear-row span:first-child{min-width:0}
+
+/* notes */
+.notes{list-style:none;margin:0;padding:14px 0 0;border-top:1px solid var(--line);display:grid;gap:9px}
+.notes:empty{display:none}
+.notes li{display:grid;grid-template-columns:10px minmax(0,1fr);gap:10px;align-items:start;font-size:14.5px;line-height:1.45}
+.notes li::before{content:"";width:8px;height:8px;border-radius:50%;margin-top:7px;background:var(--muted)}
+.notes li.n-good::before{background:var(--good)}
+.notes li.n-warn::before{background:var(--warn)}
+.notes li.n-bad::before{background:var(--bad)}
+.notes li.n-info::before{background:var(--accent)}
+
+/* sticky mini summary */
+.mini{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);left:50%;z-index:15;transform:translate(-50%,-10px);opacity:0;pointer-events:none;display:flex;gap:12px;white-space:nowrap;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font:500 13px/1 var(--font-mono);box-shadow:var(--shadow);transition:opacity .18s,transform .18s}
+.mini.show{opacity:1;transform:translate(-50%,0)}
+.mini b{font-weight:600}
+
+/* disclosure */
+details.card{gap:0}
+details.card>summary{cursor:pointer;font:600 17px/1.3 var(--font-display);letter-spacing:.01em;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px}
+details.card>summary::-webkit-details-marker{display:none}
+details.card>summary::after{content:"+";font:500 22px/1 var(--font-mono);color:var(--muted)}
+details.card[open]>summary::after{content:"–"}
+details.card[open]>summary{margin-bottom:12px}
+.prose{display:grid;gap:10px;font-size:15px;line-height:1.5}
+.prose p{max-width:65ch}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:500 11px/1.2 var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+td.num{font-family:var(--font-mono);white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* wall test */
+.steps{list-style:none;margin:0;padding:0;display:grid}
+.step{display:grid;grid-template-columns:30px minmax(0,1fr);gap:12px;padding-block:14px;border-top:1px solid var(--line)}
+.step:first-child{border-top:0;padding-top:0}
+.step:last-child{padding-bottom:0}
+.step-num{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:600 15px/1 var(--font-display);background:var(--surface-2);border:1px solid var(--line)}
+.step.done .step-num{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.step-body{display:grid;gap:4px;min-width:0}
+.step-actions{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:8px}
+.step-status{color:var(--muted)}
+.step-status.ok{color:var(--good)}
+.step-status.warn{color:var(--warn)}
+.step-status.bad{color:var(--bad)}
+.progress{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;margin-top:8px;border:1px solid var(--line)}
+.progress span{display:block;height:100%;width:0;background:var(--accent)}
+.vol{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:12px}
+input[type="range"]{width:100%;accent-color:var(--accent)}
+.big-rating{display:flex;align-items:center;gap:16px}
+.big-num{font:700 72px/0.85 var(--font-display);font-variant-numeric:tabular-nums;letter-spacing:-.01em;white-space:nowrap}
+.big-label{font:600 18px/1.2 var(--font-display)}
+.chart-wrap{overflow-x:auto;margin-inline:-4px}
+.chart{width:100%;min-width:300px;height:auto;display:block}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .axis{fill:var(--muted);font:400 11px var(--font-mono)}
+.chart .bar{fill:var(--accent)}
+.chart .bar.lower{fill:url(#wt-hatch);stroke:var(--accent);stroke-width:1.5}
+.chart .bar.invalid{fill:var(--line)}
+.chart .hatch-bg{fill:var(--accent-soft)}
+.chart .hatch-line{stroke:var(--accent);stroke-width:2}
+.chart .val{fill:var(--ink);font:600 12px var(--font-mono)}
+.chart .val.dim{fill:var(--muted);font-weight:400}
+.chart .ref{fill:none;stroke:var(--ink);stroke-width:2;stroke-dasharray:6 4}
+.chart .refdot{fill:var(--surface);stroke:var(--ink);stroke-width:2}
+.chart .reflabel{fill:var(--ink);font:600 12px var(--font-body)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:14px;height:10px;border-radius:2px;background:var(--accent);display:inline-block}
+.sw.lower{background:repeating-linear-gradient(45deg,var(--accent) 0 2px,var(--accent-soft) 2px 5px);border:1px solid var(--accent)}
+.sw.line{height:0;border-top:2px dashed var(--ink);background:none;border-radius:0}
+
+/* noise meter */
+.readout{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.readout-num{font:700 80px/0.85 var(--font-display);font-variant-numeric:tabular-nums;min-width:2ch}
+.readout-unit{font:500 22px/1 var(--font-display);color:var(--muted);margin-right:auto}
+#nm-canvas{width:100%;height:160px;display:block;border-radius:8px;background:var(--surface-2)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.stat{display:grid;gap:3px;padding:10px 8px;border-radius:10px;background:var(--surface-2);min-width:0}
+.stat b{font:600 26px/1 var(--font-display);font-variant-numeric:tabular-nums}
+.stat span{font:500 10.5px/1.2 var(--font-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.bands{display:grid;gap:5px}
+.bandrow{display:grid;grid-template-columns:52px minmax(0,1fr) 54px;align-items:center;gap:10px;font:400 12px/1 var(--font-mono);color:var(--muted)}
+.bandrow i{display:block;height:10px;border-radius:3px;background:var(--accent);opacity:.8}
+.bandrow .track{background:var(--surface-2);border-radius:3px}
+.bandrow b{font-weight:500;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
+.field{display:grid;gap:6px}
+.field label{font:600 14px/1.2 var(--font-body)}
+.input{width:100%;border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:10px 12px;min-height:44px}
+textarea.input{min-height:76px;resize:vertical}
+.inline-fields{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.inline-fields .field{flex:1 1 140px}
+
+/* banner, toast */
+.banner{background:var(--warn-soft);color:var(--ink);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;font-size:14.5px;line-height:1.45;display:grid;gap:6px}
+.banner b{color:var(--warn)}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translate(-50%,10px);opacity:0;pointer-events:none;z-index:30;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font:600 14px/1.2 var(--font-body);transition:opacity .2s,transform .2s;white-space:nowrap}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* visits */
+.kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.kv div{display:grid;gap:2px;min-width:0}
+.kv dt{font:500 10.5px/1.2 var(--font-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.kv dd{margin:0;font:600 17px/1.2 var(--font-display);font-variant-numeric:tabular-nums}
+.kv dd small{font:400 13px/1.3 var(--font-body);color:var(--muted)}
+dl{margin:0}
+.visit{display:grid;gap:12px;padding-block:14px;border-top:1px solid var(--line)}
+.visit:first-child{border-top:0;padding-top:0}
+.visit:last-child{padding-bottom:0}
+.visit-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.visit-name{font:600 19px/1.15 var(--font-display);overflow-wrap:anywhere}
+.visit-notes{font-size:14.5px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
+.visit-score{font:700 34px/0.9 var(--font-display);font-variant-numeric:tabular-nums;text-align:right}
+.visit-score small{font:500 14px var(--font-display);color:var(--muted)}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.empty{color:var(--muted);font-size:15px}
+
+/* tips */
+.checklist{list-style:none;margin:0;padding:0;display:grid}
+.checklist li{border-top:1px solid var(--line)}
+.checklist li:first-child{border-top:0}
+.checklist label{display:grid;grid-template-columns:22px minmax(0,1fr);gap:12px;padding-block:11px;cursor:pointer;font-size:15px;line-height:1.45}
+.checklist input{width:20px;height:20px;margin:1px 0 0;accent-color:var(--accent)}
+.checklist input:checked+span{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.callout{background:var(--accent-soft);border-radius:10px;padding:12px 14px;font-size:15px;line-height:1.45}
+
+/* tab bar */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);background:color-mix(in srgb,var(--surface) 92%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
+.tabbar-inner{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+.tabbtn{appearance:none;border:0;background:none;color:var(--muted);display:grid;justify-items:center;gap:3px;padding:7px 2px 6px;border-radius:10px;font:600 11.5px/1.1 var(--font-body);cursor:pointer}
+.tabbtn svg{width:22px;height:22px}
+.tabbtn[aria-current="page"]{color:var(--accent);background:var(--accent-soft)}
+.tabbtn path,.tabbtn rect,.tabbtn circle,.tabbtn line,.tabbtn polyline{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+@media (max-width:380px){
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tiles{grid-template-columns:minmax(0,1fr)}
+  .score-num{font-size:56px}
+}
+@media (prefers-reduced-motion: reduce){
+  *{transition:none!important;animation:none!important}
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <svg class="logo" viewBox="0 0 42 42" aria-hidden="true">
+      <rect x="0" y="0" width="42" height="42" rx="10" style="fill:var(--accent-soft)"/>
+      <path d="M8.5 15.5a7 7 0 0 1 0 11M5.5 12a12 12 0 0 1 0 18" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round"/>
+      <rect x="17" y="8" width="7" height="26" rx="1" style="fill:var(--accent)"/>
+      <path d="M17 13.5h7M17 19.5h7M17 25.5h7M20.5 8v5.5M20.5 19.5v6" style="stroke:var(--accent-soft);stroke-width:1.2"/>
+      <path d="M29.5 18.5a3.5 3.5 0 0 1 0 5" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;opacity:.55"/>
+    </svg>
+    <div>
+      <h1>Neighbor Noise Check</h1>
+      <p>How much will you hear through the walls?</p>
+    </div>
+  </header>
+
+  <div class="banner" id="mic-banner" hidden>
+    <p><b>The microphone is blocked in this view.</b> You can still analyze recordings: record a voice memo, then tap “Use a recording”. Recorder apps that adjust volume automatically make walls look worse than they are.</p>
+    <p id="mic-banner-link" hidden>For live measurements, open the <a id="full-link" href="#" target="_blank" rel="noopener">full version</a>.</p>
+  </div>
+
+  <main>
+  <!-- ===================== ESTIMATE ===================== -->
+  <section class="tab" id="tab-estimate">
+    <div class="mini" id="est-mini" aria-hidden="true"><span><b id="mini-score">0</b>/100</span><span id="mini-wall"></span><span id="mini-floor"></span></div>
+
+    <article class="card" id="est-result" aria-live="polite">
+      <div class="result-top">
+        <div class="score">
+          <span class="eyebrow">Quiet score</span>
+          <div><span class="score-num" id="est-score">0</span><span class="score-den">/100</span></div>
+        </div>
+        <div class="verdict">
+          <span class="pill" id="est-verdict"></span>
+          <p class="small muted" id="est-basis">Estimated from construction and layout.</p>
+        </div>
+      </div>
+      <div class="scale-block">
+        <div class="scale-head"><span class="scale-name">Neighbor walls</span><span class="scale-val" id="est-wall-val"></span></div>
+        <div id="est-wall-scale"></div>
+        <p class="scale-text" id="est-wall-text"></p>
+      </div>
+      <div class="scale-block">
+        <div class="scale-head"><span class="scale-name">Footsteps from above</span><span class="scale-val" id="est-floor-val"></span></div>
+        <div id="est-floor-scale"></div>
+        <p class="scale-text" id="est-floor-text"></p>
+      </div>
+      <div class="hear" id="est-hear"></div>
+      <ul class="notes" id="est-notes"></ul>
+    </article>
+
+    <div class="card">
+      <div class="form-head">
+        <h2>About this apartment</h2>
+        <span class="pill tone-info" id="est-example">Example answers</span>
+      </div>
+      <p class="small muted">Tap the answers that match. The estimate above updates as you go.</p>
+      <div id="questions" class="q-wrap" style="display:grid;gap:18px"></div>
+    </div>
+
+    <details class="card">
+      <summary>How the estimate works</summary>
+      <div class="prose">
+        <p>Each answer maps to typical published sound ratings for that kind of construction. <b>STC</b> (Sound Transmission Class) rates how well a wall or floor blocks airborne sound like voices and TV. <b>IIC</b> (Impact Insulation Class) rates how well a floor blocks footsteps. Higher is better for both.</p>
+        <p>The numbers shown are field values: what a wall achieves in a finished building, usually 3 to 8 points below its lab rating because sound also leaks through outlets, ducts, gaps and the structure itself. US building codes require 50 in the lab, or 45 when tested in the field, between dwellings. Many buildings older than the 1980s were never built to that.</p>
+        <p>The quiet score combines the wall and floor estimates, weighted toward the walls if a bedroom shares one, and subtracts points for noisy neighbors like elevators and trash chutes. A wall test of the neighbor wall replaces the wall estimate.</p>
+        <p>Real buildings vary. Two units in the same building can differ by 5 points or more depending on workmanship. Treat the result as a range, not a verdict.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ===================== WALL TEST ===================== -->
+  <section class="tab" id="tab-wall" hidden>
+    <div class="card">
+      <h2>Measure a wall</h2>
+      <p class="small">Play steady noise on one side of a wall, then measure how much quieter it is on the other side. The phone doesn't need to be calibrated, because only the difference counts.</p>
+      <div class="q">
+        <div class="q-label" id="wt-path-label">What are you testing?</div>
+        <div class="chips sm" role="radiogroup" aria-labelledby="wt-path-label" id="wt-path"></div>
+        <p class="q-help" id="wt-path-help" style="margin-top:0"></p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row-between">
+        <h3>Test noise</h3>
+        <button type="button" class="btn" id="tn-play">Play noise</button>
+      </div>
+      <div class="vol"><label for="tn-vol" class="eyebrow">Volume</label><input type="range" id="tn-vol" min="0" max="100" value="100"></div>
+      <p class="small muted">Plays steady pink noise. A Bluetooth speaker works best; a phone speaker is only loud enough to test doors and weak walls. You can also open this page on a second phone or laptop and play the noise there. Point the speaker at the wall from about 1 m away, and keep the volume the same for steps 2 and 3. No sound on an iPhone? Turn off silent mode.</p>
+    </div>
+
+    <div class="card">
+      <h3>Three recordings</h3>
+      <ol class="steps" id="wt-steps">
+        <li class="step" data-step="bg">
+          <div class="step-num" aria-hidden="true">1</div>
+          <div class="step-body">
+            <h3>Quiet side, noise off</h3>
+            <p class="small">Stand where you would listen for the neighbor, about 1 m from the wall, with the test noise off.</p>
+            <div class="step-actions">
+              <button type="button" class="btn" data-rec="bg">Record 10 s</button>
+              <label class="linkbtn" for="f-bg">Use a recording</label>
+              <input type="file" id="f-bg" class="vh" accept="audio/*" data-file="bg">
+            </div>
+            <div class="progress" data-prog="bg" hidden><span></span></div>
+            <p class="step-status small" data-status="bg"></p>
+          </div>
+        </li>
+        <li class="step" data-step="src">
+          <div class="step-num" aria-hidden="true">2</div>
+          <div class="step-body">
+            <h3>Loud side, noise on</h3>
+            <p class="small">Start the noise. Stand 1 to 2 m from the speaker and move the phone slowly around while it records.</p>
+            <div class="step-actions">
+              <button type="button" class="btn" data-rec="src">Record 10 s</button>
+              <label class="linkbtn" for="f-src">Use a recording</label>
+              <input type="file" id="f-src" class="vh" accept="audio/*" data-file="src">
+            </div>
+            <div class="progress" data-prog="src" hidden><span></span></div>
+            <p class="step-status small" data-status="src"></p>
+          </div>
+        </li>
+        <li class="step" data-step="rx">
+          <div class="step-num" aria-hidden="true">3</div>
+          <div class="step-body">
+            <h3>Quiet side, noise on</h3>
+            <p class="small">Leave the noise playing. Go back to the quiet side, about 1 m from the wall, and move the phone slowly while it records.</p>
+            <div class="step-actions">
+              <button type="button" class="btn" data-rec="rx">Record 10 s</button>
+              <label class="linkbtn" for="f-rx">Use a recording</label>
+              <input type="file" id="f-rx" class="vh" accept="audio/*" data-file="rx">
+            </div>
+            <div class="progress" data-prog="rx" hidden><span></span></div>
+            <p class="step-status small" data-status="rx"></p>
+          </div>
+        </li>
+      </ol>
+    </div>
+
+    <article class="card" id="wt-result">
+      <div class="row-between">
+        <span class="eyebrow">Result</span>
+        <span class="pill tone-info" id="wt-example">Example result</span>
+      </div>
+      <div class="big-rating">
+        <span class="big-num" id="wt-num">–</span>
+        <div>
+          <div class="big-label" id="wt-label">Sound isolation</div>
+          <p class="small muted" id="wt-sub">On the same scale as field STC. Higher is better.</p>
+        </div>
+      </div>
+      <p id="wt-text" class="small"></p>
+      <div class="chart-wrap" id="wt-chart"></div>
+      <div class="legend">
+        <span><i class="sw"></i>How much quieter, per frequency band (dB)</span>
+        <span><i class="sw lower"></i>At least this much</span>
+        <span><i class="sw line"></i>Rating curve</span>
+      </div>
+      <div class="q">
+        <div class="q-label" id="wt-echo-label">How echoey is the quiet-side room?</div>
+        <p class="q-help">Empty rooms make the neighbor louder than it will be once you move in. This adjusts the result to a furnished room.</p>
+        <div class="chips sm" role="radiogroup" aria-labelledby="wt-echo-label" id="wt-echo"></div>
+      </div>
+      <div class="hear" id="wt-hear"></div>
+      <ul class="notes" id="wt-notes"></ul>
+      <div class="actions"><button type="button" class="linkbtn" id="wt-clear" hidden>Clear recordings</button></div>
+    </article>
+  </section>
+
+  <!-- ===================== ROOM NOISE ===================== -->
+  <section class="tab" id="tab-noise" hidden>
+    <article class="card">
+      <div class="row-between">
+        <h2>Room noise</h2>
+        <span class="pill tone-info" id="nm-example">Example reading</span>
+      </div>
+      <p class="small muted">Measure the background noise where you would sleep. Close the windows and stay still and quiet while it records.</p>
+      <div class="readout">
+        <span class="readout-num" id="nm-now">–</span><span class="readout-unit">dB(A)</span>
+        <button type="button" class="pill tone-warn" id="nm-cal-chip">Uncalibrated</button>
+      </div>
+      <canvas id="nm-canvas" aria-label="Sound level over time" role="img"></canvas>
+      <div class="stats">
+        <div class="stat"><span>Background</span><b id="st-l90">–</b><span>L90</span></div>
+        <div class="stat"><span>Average</span><b id="st-leq">–</b><span>Leq</span></div>
+        <div class="stat"><span>Loudest</span><b id="st-max">–</b><span>Lmax</span></div>
+        <div class="stat"><span>Events</span><b id="st-ev">–</b><span>+10 dB jumps</span></div>
+      </div>
+      <div class="controls">
+        <div class="chips sm" role="radiogroup" aria-label="Duration" id="nm-dur"></div>
+        <button type="button" class="btn" id="nm-start">Start</button>
+        <label class="linkbtn" for="f-noise">Use a recording</label>
+        <input type="file" id="f-noise" class="vh" accept="audio/*">
+      </div>
+      <p id="nm-text" class="small"></p>
+      <div class="bands" id="nm-bands"></div>
+      <p class="small muted" id="nm-lf" hidden></p>
+    </article>
+
+    <details class="card" id="cal">
+      <summary>Calibrate the microphone</summary>
+      <div class="prose">
+        <p>Phone microphones aren't calibrated, so absolute readings can be off by 5 dB or more. Comparing apartments with the same phone is still meaningful. To improve accuracy, match this page to a trusted meter once, such as the free NIOSH SLM app on iPhone or a handheld sound level meter.</p>
+        <p class="small muted">Play a steady sound (a fan, or the test noise from another device). Read the trusted meter, enter its reading, then hold this phone in the same spot and tap Measure.</p>
+        <div class="inline-fields">
+          <div class="field"><label for="cal-ref">Trusted reading, dB(A)</label><input class="input" id="cal-ref" type="number" inputmode="decimal" placeholder="e.g. 58"></div>
+          <button type="button" class="btn" id="cal-measure">Measure 5 s</button>
+        </div>
+        <div class="inline-fields">
+          <div class="field"><label for="cal-offset">Offset (dB added to the raw signal)</label><input class="input" id="cal-offset" type="number" step="0.5" inputmode="decimal"></div>
+          <button type="button" class="btn secondary" id="cal-reset">Reset</button>
+        </div>
+        <p class="small" id="cal-status"></p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ===================== VISITS ===================== -->
+  <section class="tab" id="tab-visits" hidden>
+    <article class="card">
+      <h2>This visit</h2>
+      <div class="field"><label for="v-name">Apartment</label><input class="input" id="v-name" type="text" placeholder="e.g. 41 Elm St, unit 3B" autocomplete="off"></div>
+      <dl class="kv" id="v-current"></dl>
+      <div class="field"><label for="v-notes">Notes</label><textarea class="input" id="v-notes" placeholder="Bedroom backs onto neighbor's living room. Heard a TV faintly at 7 pm."></textarea></div>
+      <div class="actions">
+        <button type="button" class="btn" id="v-save">Save visit</button>
+        <button type="button" class="btn secondary" id="v-new">Start next visit</button>
+      </div>
+      <div class="banner" id="v-new-confirm" hidden>
+        <p>This clears the answers and measurements on every tab. Saved visits stay.</p>
+        <div class="actions"><button type="button" class="btn danger" id="v-new-yes">Clear and start</button><button type="button" class="linkbtn" id="v-new-no">Cancel</button></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="row-between"><h2>Saved visits</h2><span class="eyebrow" id="v-count"></span></div>
+      <div id="v-list"></div>
+      <p class="small muted">Saved in this browser on this device.</p>
+    </article>
+  </section>
+
+  <!-- ===================== TIPS ===================== -->
+  <section class="tab" id="tab-tips" hidden>
+    <article class="card">
+      <h2>On the tour</h2>
+      <p class="callout">The quietest choice is usually a top-floor corner unit in a concrete building, with the bedroom away from the elevator and the street.</p>
+      <ul class="checklist" id="checklist"></ul>
+    </article>
+    <details class="card">
+      <summary>What the ratings mean</summary>
+      <div class="prose">
+        <p>Walls (STC, field). What you hear from a neighbor with a quiet bedroom at night:</p>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Rating</th><th>What gets through</th></tr></thead>
+          <tbody id="stc-table"></tbody>
+        </table></div>
+        <p>Floors (IIC, field). Footsteps from the unit above:</p>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Rating</th><th>What gets through</th></tr></thead>
+          <tbody id="iic-table"></tbody>
+        </table></div>
+        <p>Neither rating covers deep bass below 125 Hz, so subwoofers, heavy footfalls on wood floors, and building machinery can be audible even when the ratings look good.</p>
+      </div>
+    </details>
+    <details class="card">
+      <summary>Typical ratings by construction</summary>
+      <div class="prose">
+        <p>Lab ratings for common assemblies. Expect 3 to 8 points less in a finished building.</p>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Wall</th><th>STC</th></tr></thead>
+          <tbody>
+            <tr><td>Wood studs, one layer of drywall each side, no insulation</td><td class="num">33–35</td></tr>
+            <tr><td>Same, with insulation</td><td class="num">36–39</td></tr>
+            <tr><td>Old plaster on wood lath</td><td class="num">36–42</td></tr>
+            <tr><td>Steel studs, insulation, one layer each side</td><td class="num">42–48</td></tr>
+            <tr><td>Concrete block, painted</td><td class="num">45–50</td></tr>
+            <tr><td>Wood studs, insulation, resilient channel</td><td class="num">45–52</td></tr>
+            <tr><td>Staggered studs, insulation</td><td class="num">46–50</td></tr>
+            <tr><td>Solid brick party wall, 9 to 12 in</td><td class="num">50–55</td></tr>
+            <tr><td>Poured concrete, 6 to 8 in</td><td class="num">53–58</td></tr>
+            <tr><td>Double stud wall, insulation</td><td class="num">55–62</td></tr>
+          </tbody>
+        </table></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Floor</th><th>STC</th><th>IIC</th></tr></thead>
+          <tbody>
+            <tr><td>Wood joists, hardwood, drywall ceiling</td><td class="num">37–42</td><td class="num">30–38</td></tr>
+            <tr><td>Concrete slab, bare or tile</td><td class="num">50–55</td><td class="num">25–35</td></tr>
+            <tr><td>Concrete slab, wood on acoustic underlay</td><td class="num">50–55</td><td class="num">50–58</td></tr>
+            <tr><td>Wood joists, gypsum concrete topping, resilient ceiling</td><td class="num">55–60</td><td class="num">50–55</td></tr>
+            <tr><td>Wood joists, carpet and pad</td><td class="num">40–50</td><td class="num">55–70</td></tr>
+            <tr><td>Concrete slab, carpet and pad</td><td class="num">50–55</td><td class="num">65–80</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </details>
+    <details class="card">
+      <summary>How accurate is this?</summary>
+      <div class="prose">
+        <p><b>Estimate.</b> Built from typical published ratings. Real buildings vary by 5 points or more because of workmanship, back-to-back outlets, shared ducts and sound traveling through the structure.</p>
+        <p><b>Wall test.</b> Uses the same method as professional field tests (ASTM E336, ISO 16283): a level difference between two rooms, corrected for background noise and room echo, rated against the ISO 717 reference curve in octave bands. A phone mic, few positions and a small speaker make it rougher, about ±3 to 5 points. Bass below 125 Hz isn't measured, and a phone speaker can't reach the lowest bands at all.</p>
+        <p><b>Room noise.</b> Phones aren't calibrated, so absolute levels may be off by 5 dB or more until you calibrate. Rooms quieter than about 30 dB(A) are near the microphone's own noise floor, so the real level may be lower than shown.</p>
+      </div>
+    </details>
+  </section>
+  </main>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<nav class="tabbar" aria-label="Sections">
+  <div class="tabbar-inner">
+    <button type="button" class="tabbtn" data-tab="estimate" aria-current="page">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M12 3v6M8 9v6M16 9v6M12 15v6"/></svg>Estimate</button>
+    <button type="button" class="tabbtn" data-tab="wall">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h3l4 3.5V6.5L6 10z"/><path d="M14 9.5a3.5 3.5 0 0 1 0 5M17 7a7 7 0 0 1 0 10"/><line x1="21" y1="4" x2="21" y2="20"/></svg>Wall test</button>
+    <button type="button" class="tabbtn" data-tab="noise">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h3l2-6 3 12 3-9 2 6 2-3h3"/></svg>Room noise</button>
+    <button type="button" class="tabbtn" data-tab="visits">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9H4z"/><path d="M9 20v-6h6v6"/></svg>Visits</button>
+    <button type="button" class="tabbtn" data-tab="tips">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><polyline points="3.5 6 4.8 7.3 6.8 4.8"/><polyline points="3.5 12 4.8 13.3 6.8 10.8"/><polyline points="3.5 18 4.8 19.3 6.8 16.8"/></svg>Tips</button>
+  </div>
+</nav>
+
+<script>
+(function(){
+'use strict';
+
+// Set this to the standalone (HTTPS) address once hosted; shown where the mic is blocked.
+const FULL_URL = 'https://seanwkelley.github.io/neighbor-noise-check/';
+
+// ===== CORE START =====
+const BANDS = [125, 250, 500, 1000, 2000, 4000];
+const BAND_LABELS = ['125', '250', '500', '1k', '2k', '4k'];
+const REF_OCT = {125: 36, 250: 45, 500: 52, 1000: 55, 2000: 56}; // ISO 717-1 octave reference curve
+const A_OCT = [-16.1, -8.6, -3.2, 0, 1.2, 1.0];
+const FFT_N = 8192;
+
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+function toDb(p){ return 10 * Math.log10(Math.max(p, 1e-20)); }
+
+function aWeightDb(f){
+  const f2 = f * f;
+  const ra = (Math.pow(12194, 2) * f2 * f2) /
+    ((f2 + 20.6 * 20.6) * Math.sqrt((f2 + 107.7 * 107.7) * (f2 + 737.9 * 737.9)) * (f2 + 12194 * 12194));
+  return 20 * Math.log10(ra) + 2.0;
+}
+
+function makeFFT(N){
+  const levels = Math.round(Math.log2(N));
+  const cos = new Float64Array(N / 2), sin = new Float64Array(N / 2);
+  for (let i = 0; i < N / 2; i++){ cos[i] = Math.cos(2 * Math.PI * i / N); sin[i] = Math.sin(2 * Math.PI * i / N); }
+  const rev = new Uint32Array(N);
+  for (let i = 0; i < N; i++){
+    let r = 0, x = i;
+    for (let j = 0; j < levels; j++){ r = (r << 1) | (x & 1); x >>>= 1; }
+    rev[i] = r;
+  }
+  return function fft(re, im){
+    for (let i = 0; i < N; i++){
+      const j = rev[i];
+      if (j > i){ let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+    }
+    for (let size = 2; size <= N; size <<= 1){
+      const half = size >> 1, step = N / size;
+      for (let i = 0; i < N; i += size){
+        for (let j = i, k = 0; j < i + half; j++, k += step){
+          const l = j + half;
+          const tre = re[l] * cos[k] + im[l] * sin[k];
+          const tim = -re[l] * sin[k] + im[l] * cos[k];
+          re[l] = re[j] - tre; im[l] = im[j] - tim;
+          re[j] += tre; im[j] += tim;
+        }
+      }
+    }
+  };
+}
+
+// Returns analyze(frame) -> { a: A-weighted mean square, bands: octave-band mean squares }
+function makeAnalyzer(sampleRate){
+  const N = FFT_N, half = N / 2, fft = makeFFT(N);
+  const win = new Float64Array(N);
+  let w2 = 0;
+  for (let i = 0; i < N; i++){ win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N); w2 += win[i] * win[i]; }
+  const scale = 2 / (N * w2), binHz = sampleRate / N;
+  const aw = new Float64Array(half), bandOf = new Int8Array(half).fill(-1);
+  for (let k = 1; k < half; k++){
+    const f = k * binHz;
+    aw[k] = (f < 20 || f > 20000) ? 0 : Math.pow(10, aWeightDb(f) / 10);
+    for (let b = 0; b < BANDS.length; b++){
+      if (f >= BANDS[b] / Math.SQRT2 && f < BANDS[b] * Math.SQRT2){ bandOf[k] = b; break; }
+    }
+  }
+  const re = new Float64Array(N), im = new Float64Array(N);
+  return function analyze(x){
+    let mean = 0;
+    for (let i = 0; i < N; i++) mean += x[i];
+    mean /= N;
+    for (let i = 0; i < N; i++){ re[i] = (x[i] - mean) * win[i]; im[i] = 0; }
+    fft(re, im);
+    let a = 0;
+    const bands = BANDS.map(() => 0);
+    for (let k = 1; k < half; k++){
+      const p = (re[k] * re[k] + im[k] * im[k]) * scale;
+      a += p * aw[k];
+      const b = bandOf[k];
+      if (b >= 0) bands[b] += p;
+    }
+    return { a, bands };
+  };
+}
+
+// Energy average of frames -> levels in raw dB (no calibration offset)
+function averageFrames(frames){
+  const n = frames.length;
+  let a = 0;
+  const bands = BANDS.map(() => 0);
+  for (const fr of frames){ a += fr.a; for (let i = 0; i < bands.length; i++) bands[i] += fr.bands[i]; }
+  return { a: toDb(a / n), bands: bands.map(p => toDb(p / n)) };
+}
+
+function aFromBands(bands){
+  return toDb(bands.reduce((s, l, i) => s + Math.pow(10, (l + A_OCT[i]) / 10), 0));
+}
+
+// ISO 717-1 style rating in octave bands: shift the reference curve up until the
+// sum of unfavorable deviations would exceed 2 dB per band (10 dB for all five).
+function rateBands(bands){
+  const used = bands.filter(b => b.valid && REF_OCT[b.f] !== undefined);
+  if (used.length < 3) return null;
+  const limit = 2 * used.length;
+  const dev = s => used.reduce((sum, b) => sum + Math.max(0, REF_OCT[b.f] + s - b.d), 0);
+  let s = -80;
+  while (s < 80 && dev(s + 1) <= limit) s++;
+  const limitedBy = used.filter(b => b.lower && REF_OCT[b.f] + s > b.d);
+  return {
+    value: 52 + s,
+    shift: s,
+    lowerBound: limitedBy.length > 0,
+    used: used.map(b => b.f),
+    missingLow: !used.some(b => b.f === 125)
+  };
+}
+
+// B: background, L1: loud side, L2: quiet side; each { a, bands } in raw dB
+function wallTest(B, L1, L2){
+  const bands = BANDS.map((f, i) => {
+    const b = B.bands[i], l1 = L1.bands[i], l2 = L2.bands[i];
+    const srcSnr = l1 - b, rxSnr = l2 - b;
+    let l2c = l2, lower = false;
+    if (rxSnr <= 6){ l2c = l2 - 1.3; lower = true; }
+    else if (rxSnr <= 10){ l2c = 10 * Math.log10(Math.pow(10, l2 / 10) - Math.pow(10, b / 10)); }
+    return { f, d: l1 - l2c, lower, valid: srcSnr >= 10, srcSnr, rxSnr };
+  });
+  const rating = rateBands(bands);
+  let aDrop, aLower = false;
+  if (L2.a - B.a > 10) aDrop = L1.a - L2.a;
+  else if (L2.a - B.a > 3) aDrop = L1.a - 10 * Math.log10(Math.pow(10, L2.a / 10) - Math.pow(10, B.a / 10));
+  else { aDrop = L1.a - B.a; aLower = true; }
+  const valid = bands.filter(b => b.valid).map(b => b.d).sort((x, y) => x - y);
+  const med = valid.length ? valid[Math.floor(valid.length / 2)] : null;
+  return {
+    bands, rating, aDrop, aLower,
+    swapped: med !== null && med < 0,
+    tooClose: med !== null && med >= 0 && med < 4
+  };
+}
+
+function noiseStats(levels, frameSec){
+  const n = levels.length;
+  if (!n) return null;
+  const sorted = levels.slice().sort((a, b) => a - b);
+  const pct = q => sorted[clamp(Math.floor(q * (n - 1)), 0, n - 1)];
+  const L90 = pct(0.10);
+  const Leq = toDb(levels.reduce((s, l) => s + Math.pow(10, l / 10), 0) / n);
+  let events = 0, above = false, last = -1e9;
+  for (let i = 0; i < n; i++){
+    const up = levels[i] > L90 + 10;
+    if (up && !above && (i - last) * frameSec >= 1){ events++; last = i; }
+    above = up;
+  }
+  return { L90, Leq, Lmax: sorted[n - 1], events, duration: n * frameSec };
+}
+
+// ----- Estimator: typical field ratings by construction -----
+const WALL_EST = { // field STC [lo, hi] by knock result
+  concrete:  { light: [44, 52], heavy: [48, 56], solid: [50, 58], none: [46, 56] },
+  hybrid:    { light: [38, 45], heavy: [45, 52], solid: [48, 55], none: [40, 51] },
+  wood:      { light: [33, 42], heavy: [43, 51], solid: [44, 52], none: [35, 48] },
+  prewar:    { light: [36, 44], heavy: [42, 50], solid: [47, 55], none: [40, 52] },
+  converted: { light: [30, 38], heavy: [36, 45], solid: [40, 48], none: [31, 43] },
+  unknown:   { light: [33, 43], heavy: [42, 52], solid: [47, 56], none: [34, 52] }
+};
+const FLOOR_EST = { // field IIC [lo, hi] by floor finish
+  concrete:  { carpet: [60, 72], hard: [42, 54], mixed: [48, 62] },
+  hybrid:    { carpet: [58, 70], hard: [40, 52], mixed: [46, 60] },
+  wood:      { carpet: [50, 62], hard: [38, 48], mixed: [42, 55] },
+  prewar:    { carpet: [48, 58], hard: [34, 45], mixed: [40, 52] },
+  converted: { carpet: [42, 54], hard: [28, 40], mixed: [34, 47] },
+  unknown:   { carpet: [48, 66], hard: [32, 50], mixed: [38, 56] }
+};
+const LIGHTWEIGHT = ['hybrid', 'wood', 'converted', 'unknown'];
+const YEAR_WALL = { pre1950: -2, y1950: -3, y1980: 0, y2000: 1, y2015: 2, unknown: 0 };
+const YEAR_FLOOR = { pre1950: -3, y1950: -5, y1980: -2, y2000: 0, y2015: 2, unknown: 0 };
+const NEAR = {
+  elevator: { w: .06, text: 'Elevator: motor hum, door chimes and late-night trips. Worst when it backs onto a bedroom.' },
+  stairs:   { w: .04, text: 'Stairwell: door slams and footsteps at all hours.' },
+  trash:    { w: .05, text: 'Trash chute: bangs and thuds, often late at night.' },
+  laundry:  { w: .04, text: 'Laundry or mechanical room: hum and vibration from machines.' },
+  lobby:    { w: .04, text: 'Lobby or main entrance: voices, deliveries and door slams.' },
+  garage:   { w: .04, text: 'Garage door: motor rumble, often early in the morning.' },
+  retail:   { w: .08, text: 'Bar, restaurant or shop: bass, kitchen exhaust fans and early deliveries.' },
+  amenity:  { w: .06, text: 'Gym or roof deck above: dropped weights and gatherings carry through the structure.' },
+  street:   { w: .05, text: 'Busy street: check that windows are double-pane and close tightly.' }
+};
+
+function estimate(a, measured){
+  const s = WALL_EST[a.structure] ? a.structure : 'unknown';
+  let [wlo, whi] = WALL_EST[s][a.knock] || WALL_EST[s].none;
+  const yearKnown = a.year && a.year !== 'unknown';
+  if (LIGHTWEIGHT.includes(s)){ const y = YEAR_WALL[a.year] || 0; wlo += y; whi += y; }
+  if (!yearKnown){ wlo -= 1; whi += 1; }
+  if (a.built === 'condo'){ wlo += 2; whi += 2; }
+  wlo = clamp(wlo, 25, 68); whi = clamp(whi, wlo, 68);
+
+  const top = a.position === 'top';
+  let floor = null;
+  if (!top){
+    const fin = FLOOR_EST[s][a.floors] ? a.floors : 'mixed';
+    let [flo, fhi] = FLOOR_EST[s][fin];
+    if (fin !== 'carpet' && s !== 'prewar'){ const y = YEAR_FLOOR[a.year] || 0; flo += y; fhi += y; }
+    if (!yearKnown){ flo -= 2; fhi += 1; }
+    if (a.built === 'condo'){ flo += 2; fhi += 2; }
+    flo = clamp(flo, 20, 80);
+    floor = [flo, clamp(fhi, flo, 80)];
+  }
+  const thud = !top && ['wood', 'prewar', 'converted', 'unknown'].includes(s);
+
+  const wallMid = measured != null ? measured : (wlo + whi) / 2;
+  const wallN = clamp((wallMid - 32) / 26, 0, 1);
+  const floorN = floor ? clamp(((floor[0] + floor[1]) / 2 - 32) / 36, 0, 1) : 1;
+  const wW = a.bedroom === 'yes' ? 0.6 : a.bedroom === 'no' ? 0.45 : 0.5;
+  let sc = wW * wallN + (1 - wW) * floorN;
+  if (a.shared === 'one') sc += 0.04;
+  if (a.door === 'light') sc -= 0.04;
+  if (thud) sc -= 0.03;
+  (a.near || []).forEach(k => { sc -= NEAR[k] ? NEAR[k].w : 0.04; });
+  const score = Math.round(100 * clamp(sc, 0, 1));
+  const verdict = score >= 75 ? { label: 'Quiet', tone: 'good' }
+    : score >= 58 ? { label: 'Some neighbor noise', tone: 'ok' }
+    : score >= 40 ? { label: "You'll hear neighbors", tone: 'warn' }
+    : { label: 'Thin walls and floors', tone: 'bad' };
+
+  const notes = [];
+  if (s === 'unknown') notes.push(['info', 'The building type matters most. Ask the leasing office whether it is concrete or wood frame.']);
+  if (a.knock === 'none' || !a.knock) notes.push(['info', 'Knock on a shared wall to narrow the wall estimate.']);
+  if (measured != null) notes.push(['info', 'The score uses your wall test (' + Math.round(measured) + ') instead of the wall estimate.']);
+  if (top) notes.push(['good', 'Top floor: no footsteps from above. Ask about rooftop equipment.']);
+  if (thud) notes.push(['warn', s === 'prewar'
+    ? 'Older buildings usually have wood floors between units, so footsteps and thumps come through.'
+    : 'Wood-framed floors pass low thumps from footsteps, even when the rating looks fine. Ask if the lease requires rugs.']);
+  if (!top && (s === 'concrete' || s === 'hybrid') && a.floors === 'hard' && (a.year === 'pre1950' || a.year === 'y1950'))
+    notes.push(['warn', 'Hard floors laid directly on concrete, common in older buildings, pass sharp footsteps and dropped objects.']);
+  if (a.bedroom === 'yes' && (measured != null ? measured : wlo) < 52)
+    notes.push(['warn', 'A bedroom shares a wall with a neighbor. Ask what room is on the other side; their bedroom is better than their living room or kitchen.']);
+  if (a.shared === 'one') notes.push(['good', 'End or corner unit: fewer neighbors to hear.']);
+  if (a.door === 'light') notes.push(['warn', 'A light door or a gap under it lets in hallway voices and door slams.']);
+  (a.near || []).forEach(k => { if (NEAR[k]) notes.push([k === 'retail' ? 'bad' : 'warn', NEAR[k].text]); });
+  if (a.built === 'condo') notes.push(['good', 'Condo buildings are often built with better sound separation.']);
+
+  return { wall: [wlo, whi], floor, top, thud, score, verdict, notes };
+}
+
+// ----- What you'd hear: received level vs. background -----
+const HEAR_SOURCES = [
+  { name: 'Normal conversation', L: 60, adj: 0, speech: true },
+  { name: 'Raised voices, arguing', L: 72, adj: 0, speech: true },
+  { name: 'TV at normal volume', L: 63, adj: -1 },
+  { name: 'Loud TV, movies, games', L: 74, adj: -2 },
+  { name: 'Loud music', L: 82, adj: -3 },
+  { name: 'Bass from a subwoofer', L: 80, adj: -10 }
+];
+const HEAR_CATS = [
+  { min: 5, label: 'Clear', speech: 'Words clear', tone: 'bad' },
+  { min: -4, label: 'Audible', speech: 'Murmur', tone: 'warn' },
+  { min: -10, label: 'Faint', speech: 'Faint', tone: 'ok' },
+  { min: -Infinity, label: 'Not heard', speech: 'Not heard', tone: 'good' }
+];
+function hearCat(margin){ return HEAR_CATS.findIndex(c => margin >= c.min); }
+function hearRows(Rlo, Rhi, bg){
+  return HEAR_SOURCES.map(s => ({
+    name: s.name,
+    speech: !!s.speech,
+    worst: hearCat(s.L - (Rlo + s.adj) - bg),
+    best: hearCat(s.L - (Rhi + s.adj) - bg)
+  }));
+}
+
+function stcText(v){
+  if (v < 35) return 'Thin. Normal conversation next door is audible, and raised voices can be understood.';
+  if (v < 40) return 'Weak. Raised voices and TV come through clearly; normal talking is a murmur.';
+  if (v < 45) return 'Below the code minimum for new buildings. Loud talking and TV come through as a murmur; music is clear.';
+  if (v < 50) return 'Around the code minimum. Loud voices are faint; music and bass come through.';
+  if (v < 55) return 'Good. Most speech is inaudible; loud music and bass are still noticeable.';
+  if (v < 60) return 'Very good. Only loud music and bass are likely to be heard.';
+  return 'Excellent. Most sounds are inaudible, apart from heavy bass.';
+}
+function iicText(v){
+  if (v < 40) return 'Normal walking is clearly heard; heels and dropped objects are loud.';
+  if (v < 50) return 'Footsteps are noticeable most of the time; heels, running and dropped objects are clear.';
+  if (v < 55) return 'Around the code minimum. Heavy walking, heels and dropped objects are noticeable.';
+  if (v < 65) return 'Good. Mostly heavy footsteps and thumps come through.';
+  return 'Excellent. Footsteps are rarely noticed.';
+}
+function doorText(v){
+  if (v < 20) return 'Very leaky. Conversations in the hallway will be clear inside.';
+  if (v < 25) return 'Typical light door. Hallway voices and door slams will come through.';
+  if (v < 30) return 'Typical solid door. Loud hallway noise comes through faintly.';
+  return 'Well sealed. Hallway noise should rarely bother you.';
+}
+// ===== CORE END =====
+
+// ---------------------------------------------------------------- UI
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const r0 = v => Math.round(v);
+const DEFAULT_OFFSET = 110;
+const FRAME_SEC = 0.1;
+
+const QUESTIONS = [
+  { section: 'Construction', id: 'structure', type: 'tiles', label: 'What is the building made of?',
+    help: 'Ask the leasing office. Most US buildings of 2 to 5 stories are wood frame, including new ones with shops on the ground floor.',
+    options: [
+      ['concrete', 'Concrete or masonry', 'Concrete high-rise, block or poured walls'],
+      ['hybrid', 'Concrete floors, drywall walls', 'Most modern high-rises'],
+      ['wood', 'Wood frame', 'Most low- and mid-rise buildings'],
+      ['prewar', 'Pre-war brick', 'Brick with plaster walls, before 1940'],
+      ['converted', 'Converted house', 'An older house split into units'],
+      ['unknown', 'Not sure', 'Ask, or use the knock test']
+    ] },
+  { id: 'knock', label: 'Knock on a shared wall', help: 'Use a knuckle at a few spots on a wall you share with a neighbor, and compare with an interior wall.',
+    options: [['light', 'Hollow, drummy, flexes a little'], ['heavy', 'Hollow but dull and heavy'], ['solid', 'Solid, like stone'], ['none', 'Not tried']] },
+  { id: 'year', label: 'Year built',
+    options: [['pre1950', 'Before 1950'], ['y1950', '1950–79'], ['y1980', '1980–99'], ['y2000', '2000–14'], ['y2015', '2015 or later'], ['unknown', 'Not sure']] },
+  { id: 'built', label: 'Built as', help: 'Condo buildings are often built with better sound separation, because owners can sue the developer.',
+    options: [['condo', 'Condos'], ['rental', 'Rentals'], ['unknown', 'Not sure']] },
+  { section: 'The unit', id: 'position', label: 'Which floor?',
+    options: [['top', 'Top floor'], ['middle', 'Middle floor'], ['ground', 'Ground floor']] },
+  { id: 'floors', label: 'Floors in this unit', help: 'The unit above usually has the same floors as this one.',
+    options: [['carpet', 'Carpet'], ['hard', 'Hard floors'], ['mixed', 'Mixed']] },
+  { id: 'shared', label: 'Walls shared with neighbors',
+    options: [['one', 'One (end or corner unit)'], ['two', 'Two or more'], ['unknown', 'Not sure']] },
+  { id: 'bedroom', label: 'Does a bedroom share a wall with a neighbor?',
+    options: [['yes', 'Yes'], ['no', 'No'], ['unknown', 'Not sure']] },
+  { section: 'Around the unit', id: 'door', label: 'Entry door', help: 'Look for light under the door from the hallway.',
+    options: [['solid', 'Solid with seals'], ['light', 'Light, or a gap under it'], ['unknown', 'Not sure']] },
+  { id: 'near', multi: true, label: 'Next to, above or below the unit', help: 'Select all that apply.',
+    options: [['elevator', 'Elevator'], ['stairs', 'Stairwell'], ['trash', 'Trash chute'], ['laundry', 'Laundry or mechanical room'],
+      ['lobby', 'Lobby or entrance'], ['garage', 'Garage door'], ['retail', 'Bar, restaurant or shop'], ['amenity', 'Gym or roof deck above'], ['street', 'Busy street']] }
+];
+
+const GLYPHS = {
+  concrete: '<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="3" width="22" height="26" rx="1.5" class="g-line"/><g class="g-dot"><circle cx="10" cy="8" r="1"/><circle cx="21" cy="11" r="1"/><circle cx="14" cy="18" r="1"/><circle cx="22" cy="23" r="1"/><circle cx="9.5" cy="25" r="1"/><circle cx="18" cy="26" r=".8"/><circle cx="23" cy="6" r=".8"/></g><path class="g-line" d="M15 6.5l2 3h-4zM9.5 13l2 3h-4zM20 15l2 3h-4zM13.5 21.5l2 3h-4z"/></svg>',
+  hybrid: '<svg viewBox="0 0 32 32" aria-hidden="true"><path class="g-line" d="M7 3v19M10 3v19M22 3v19M25 3v19M13 6h6M13 6v13h6M19 6v13"/><rect x="3" y="23" width="26" height="6" class="g-line"/><g class="g-dot"><circle cx="8" cy="26" r=".9"/><circle cx="15" cy="27" r=".9"/><circle cx="22" cy="25.5" r=".9"/></g></svg>',
+  wood: '<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="3" width="3" height="26" class="g-line"/><rect x="24" y="3" width="3" height="26" class="g-line"/><path class="g-line" d="M8 5l16 3-16 3 16 3-16 3 16 3-16 3 16 3"/></svg>',
+  prewar: '<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="4" width="24" height="24" class="g-line"/><path class="g-line" d="M4 10h24M4 16h24M4 22h24M12 4v6M21 4v6M8 10v6M17 10v6M12 16v6M21 16v6M8 22v6M17 22v6"/></svg>',
+  converted: '<svg viewBox="0 0 32 32" aria-hidden="true"><path class="g-line" d="M4 15L16 5l12 10v13H4zM16 13v15M10 19h3M19 19h3"/></svg>',
+  unknown: '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" class="g-line"/><path class="g-line" d="M12.5 12.8a3.5 3.5 0 1 1 5 3.2c-1 .5-1.5 1.2-1.5 2.3v.6"/><circle cx="16" cy="22.6" r="1.2" class="g-dot"/></svg>'
+};
+
+const EXAMPLE_ANSWERS = { structure: 'wood', knock: 'heavy', year: 'y2000', built: 'rental', position: 'middle', floors: 'mixed', shared: 'two', bedroom: 'yes', door: 'unknown', near: ['elevator'] };
+const BLANK_ANSWERS = { structure: 'unknown', knock: 'none', year: 'unknown', built: 'unknown', position: 'middle', floors: 'mixed', shared: 'unknown', bedroom: 'unknown', door: 'unknown', near: [] };
+
+const PATHS = {
+  neighbor: { label: 'Wall to the next unit', kind: 'wall', help: 'Needs access to the neighboring unit, such as a vacant one the agent can open.' },
+  hall: { label: 'Hallway to unit, through the door', kind: 'door', help: 'Put the speaker in the hallway facing the entry door, and listen from inside with the door closed.' },
+  hallwall: { label: 'Hallway to unit, wall only', kind: 'wall', help: 'Put the speaker in the hallway facing a wall away from the door, and listen from the room behind it.' },
+  floor: { label: 'Floor or ceiling', kind: 'wall', help: 'Speaker in the unit above or below. Measures voices and TV between floors, not footsteps.' },
+  room: { label: 'Room to room in the unit', kind: 'interior', help: 'Useful for comparing walls, or checking the bedroom wall and door.' }
+};
+const ECHO = {
+  empty: { label: 'Empty, echoey', corr: 3 },
+  some: { label: 'Some furniture or carpet', corr: 1.5 },
+  furnished: { label: 'Furnished', corr: 0 }
+};
+const BG_OPTS = { night: { label: 'Quiet night', value: 28 }, measured: { label: 'Your reading' }, masking: { label: 'White-noise machine', value: 42 } };
+
+// Example data shown until real measurements exist. Raw dB = display dB - DEFAULT_OFFSET.
+function exampleWall(){
+  const mk = disp => { const bands = disp.map(v => v - DEFAULT_OFFSET); return { a: aFromBands(bands), bands }; };
+  return {
+    bg: mk([38, 33, 28, 25, 22, 20]),
+    src: mk([84, 88, 90, 89, 87, 83]),
+    rx: mk([58, 55, 50, 44, 40, 34])
+  };
+}
+function exampleNoise(){
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const raw = [];
+  for (let i = 0; i < 600; i++){
+    let l = 33 + (rnd() - 0.5) * 2.4;
+    if (i >= 140 && i < 152) l = Math.max(l, 47 - (i - 140) * 1.2);
+    if (i >= 360 && i < 430) l = Math.max(l, 33 + Math.sin((i - 360) / 70 * Math.PI) * 7);
+    if (i >= 512 && i < 515) l = 50 - (i - 512) * 3;
+    raw.push(+(l - DEFAULT_OFFSET).toFixed(2));
+  }
+  return { raw, bands: [44, 39, 33, 28, 23, 19].map(v => v - DEFAULT_OFFSET), example: true };
+}
+
+// ---------------------------------------------------------------- state
+const STORE_KEY = 'neighbor-noise-check.v1';
+function load(){ try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; } }
+const saved = load();
+const state = {
+  answers: Object.assign({}, EXAMPLE_ANSWERS, saved.answers || {}),
+  answersExample: saved.answers ? !!saved.answersExample : true,
+  bgMode: saved.bgMode || 'night',
+  bgModeChosen: !!saved.bgModeChosen,
+  wall: Object.assign({ path: 'neighbor', echo: 'some', steps: { bg: null, src: null, rx: null } }, saved.wall || {}),
+  noise: saved.noise || null,
+  meterDur: saved.meterDur || 60,
+  offset: typeof saved.offset === 'number' ? saved.offset : DEFAULT_OFFSET,
+  calibrated: !!saved.calibrated,
+  visit: Object.assign({ name: '', notes: '' }, saved.visit || {}),
+  visits: Array.isArray(saved.visits) ? saved.visits : [],
+  checks: saved.checks || {},
+  tab: saved.tab || 'estimate'
+};
+if (!state.wall.steps) state.wall.steps = { bg: null, src: null, rx: null };
+function persist(){ try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
+
+function wallReady(){ const s = state.wall.steps; return !!(s.bg && s.src && s.rx); }
+function currentWall(){
+  const real = wallReady();
+  const d = real ? state.wall.steps : exampleWall();
+  const res = wallTest(d.bg, d.src, d.rx);
+  const corr = ECHO[state.wall.echo] ? ECHO[state.wall.echo].corr : 0;
+  const value = res.rating ? r0(res.rating.value + corr) : null;
+  return { real, res, value, corr };
+}
+function measuredNeighbor(){
+  if (state.wall.path !== 'neighbor' || !wallReady()) return null;
+  const w = currentWall();
+  return w.value;
+}
+function noiseData(){ return state.noise && state.noise.raw && state.noise.raw.length ? state.noise : exampleNoise(); }
+function noiseReal(){ return !!(state.noise && state.noise.raw && state.noise.raw.length); }
+function currentNoiseStats(){
+  const d = noiseData();
+  return noiseStats(d.raw.map(v => v + state.offset), FRAME_SEC);
+}
+function bgLevel(){
+  if (state.bgMode === 'measured' && noiseReal()) return { mode: 'measured', value: r0(currentNoiseStats().L90) };
+  if (state.bgMode === 'masking') return { mode: 'masking', value: BG_OPTS.masking.value };
+  return { mode: 'night', value: BG_OPTS.night.value };
+}
+
+// ---------------------------------------------------------------- shared renderers
+function scaleHTML(cfg){
+  const { min, max, zones, lo, hi, ref, refLabel, marker } = cfg;
+  const pct = v => ((clamp(v, min, max) - min) / (max - min) * 100).toFixed(2) + '%';
+  const stops = [];
+  let prev = min;
+  for (const [upto, tone] of zones){
+    const end = Math.min(upto, max);
+    stops.push('var(--' + tone + '-soft) ' + pct(prev) + ' ' + pct(end));
+    prev = end;
+    if (end >= max) break;
+  }
+  let ticks = '';
+  for (let t = Math.ceil(min / 10) * 10; t <= max; t += 10) ticks += '<span style="left:' + pct(t) + '">' + t + '</span>';
+  return '<div class="scale-track" style="background:linear-gradient(to right,' + stops.join(',') + ')">' +
+    (ref != null ? '<span class="scale-ref" style="left:' + pct(ref) + '"><i>' + refLabel + '</i></span>' : '') +
+    (lo != null ? '<span class="scale-range" style="left:' + pct(lo) + ';width:calc(' + pct(hi) + ' - ' + pct(lo) + ')"></span>' : '') +
+    (marker != null ? '<span class="scale-marker" style="left:' + pct(marker) + '"></span>' : '') +
+    '</div><div class="scale-ticks" aria-hidden="true">' + ticks + '</div>';
+}
+const WALL_ZONES = [[40, 'bad'], [45, 'warn'], [55, 'ok'], [Infinity, 'good']];
+const FLOOR_ZONES = [[40, 'bad'], [50, 'warn'], [60, 'ok'], [Infinity, 'good']];
+
+function catLabel(i, speech){ return speech ? HEAR_CATS[i].speech : HEAR_CATS[i].label; }
+function hearHTML(Rlo, Rhi, title){
+  const bg = bgLevel();
+  const rows = hearRows(Rlo, Rhi, bg.value);
+  const haveMeasured = noiseReal();
+  const chips = Object.keys(BG_OPTS).map(k => {
+    const o = BG_OPTS[k];
+    const val = k === 'measured' ? (haveMeasured ? r0(currentNoiseStats().L90) : null) : o.value;
+    const dis = k === 'measured' && !haveMeasured;
+    return '<button type="button" class="chip" role="radio" data-bg="' + k + '" aria-checked="' + (bg.mode === k) + '"' + (dis ? ' disabled title="Measure on the Room noise tab first"' : '') + '>' +
+      o.label + (val != null ? ' · ' + val : '') + '</button>';
+  }).join('');
+  return '<h3>' + title + '</h3>' +
+    '<div class="chips sm" role="radiogroup" aria-label="Background noise in your room">' + chips + '</div>' +
+    '<div class="hear-rows">' + rows.map(r => {
+      const tone = HEAR_CATS[r.worst].tone;
+      let text = catLabel(r.worst, r.speech);
+      if (r.best !== r.worst) text += ' to ' + catLabel(r.best, r.speech).toLowerCase();
+      return '<div class="hear-row"><span>' + r.name + '</span><span class="pill tone-' + tone + '">' + text + '</span></div>';
+    }).join('') + '</div>' +
+    '<p class="small muted">Assumes ' + bg.value + ' dB(A) of background noise in your room. The quieter your room, the easier neighbors are to hear; a white-noise machine masks a lot.</p>';
+}
+function notesHTML(notes){ return notes.map(([tone, text]) => '<li class="n-' + tone + '">' + esc(text) + '</li>').join(''); }
+
+// ---------------------------------------------------------------- estimate tab
+function renderQuestions(){
+  let html = '';
+  let open = false;
+  for (const q of QUESTIONS){
+    if (q.section){
+      if (open) html += '</div>';
+      html += '<div class="qsec"><div class="eyebrow">' + q.section + '</div>';
+      open = true;
+    }
+    html += '<div class="q"><div class="q-label" id="ql-' + q.id + '">' + q.label + '</div>' + (q.help ? '<p class="q-help">' + q.help + '</p>' : '');
+    if (q.type === 'tiles'){
+      html += '<div class="tiles" role="radiogroup" aria-labelledby="ql-' + q.id + '" data-q="' + q.id + '">' +
+        q.options.map(([v, l, d]) => '<button type="button" class="tile" role="radio" aria-checked="false" data-v="' + v + '">' + GLYPHS[v] + '<span><b>' + l + '</b>' + (d ? '<small>' + d + '</small>' : '') + '</span></button>').join('') + '</div>';
+    } else {
+      html += '<div class="chips" ' + (q.multi ? 'data-multi role="group"' : 'role="radiogroup"') + ' aria-labelledby="ql-' + q.id + '" data-q="' + q.id + '">' +
+        q.options.map(([v, l]) => '<button type="button" class="chip" ' + (q.multi ? 'aria-pressed="false"' : 'role="radio" aria-checked="false"') + ' data-v="' + v + '">' + l + '</button>').join('') + '</div>';
+    }
+    html += '</div>';
+  }
+  if (open) html += '</div>';
+  $('#questions').innerHTML = html;
+}
+
+function renderEstimate(){
+  const measured = measuredNeighbor();
+  const est = estimate(state.answers, measured);
+  $$('[data-q]').forEach(group => {
+    const q = group.dataset.q, multi = group.hasAttribute('data-multi');
+    group.querySelectorAll('[data-v]').forEach(btn => {
+      const on = multi ? (state.answers[q] || []).includes(btn.dataset.v) : state.answers[q] === btn.dataset.v;
+      btn.setAttribute(multi ? 'aria-pressed' : 'aria-checked', String(on));
+    });
+  });
+  $('#est-example').hidden = !state.answersExample;
+  $('#est-score').textContent = est.score;
+  const v = $('#est-verdict');
+  v.textContent = est.verdict.label;
+  v.className = 'pill tone-' + est.verdict.tone;
+  $('#est-basis').textContent = measured != null ? 'From your wall test plus construction and layout.' : 'Estimated from construction and layout.';
+
+  const [wlo, whi] = est.wall;
+  $('#est-wall-val').textContent = 'STC ' + wlo + '–' + whi;
+  $('#est-wall-scale').innerHTML = scaleHTML({ min: 25, max: 70, zones: WALL_ZONES, lo: wlo, hi: whi, ref: 45, refLabel: 'Code min', marker: measured });
+  $('#est-wall-text').textContent = (measured != null ? 'Your test measured ' + measured + '. ' + stcText(measured) : stcText((wlo + whi) / 2));
+
+  if (est.floor){
+    const [flo, fhi] = est.floor;
+    $('#est-floor-val').textContent = 'IIC ' + flo + '–' + fhi;
+    $('#est-floor-scale').innerHTML = scaleHTML({ min: 25, max: 80, zones: FLOOR_ZONES, lo: flo, hi: fhi, ref: 45, refLabel: 'Code min' });
+    $('#est-floor-text').textContent = iicText((flo + fhi) / 2);
+    $('#est-floor-text').className = 'scale-text';
+  } else {
+    $('#est-floor-val').textContent = 'None above';
+    $('#est-floor-scale').innerHTML = '';
+    $('#est-floor-text').textContent = 'Top floor, so there are no upstairs neighbors.';
+    $('#est-floor-text').className = 'scale-none';
+  }
+  const Rlo = measured != null ? measured - 2 : wlo, Rhi = measured != null ? measured + 2 : whi;
+  $('#est-hear').innerHTML = hearHTML(Rlo, Rhi, 'Through the wall, you would hear');
+  $('#est-notes').innerHTML = notesHTML(est.notes);
+
+  $('#mini-score').textContent = est.score;
+  $('#mini-wall').textContent = 'Walls ' + (measured != null ? measured : wlo + '–' + whi);
+  $('#mini-floor').textContent = est.floor ? 'Floor ' + est.floor[0] + '–' + est.floor[1] : 'Top floor';
+}
+
+// ---------------------------------------------------------------- wall test tab
+function chartSVG(res){
+  const W = 520, H = 236, padL = 34, padR = 12, padT = 22, padB = 30;
+  const n = BANDS.length, cw = (W - padL - padR) / n;
+  const ymax = 70;
+  const y = v => padT + (1 - clamp(v, 0, ymax) / ymax) * (H - padT - padB);
+  let s = '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Level difference by frequency band">' +
+    '<defs><pattern id="wt-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" class="hatch-bg"/><line x1="0" y1="0" x2="0" y2="6" class="hatch-line"/></pattern></defs>';
+  for (let v = 0; v <= ymax; v += 10){
+    s += '<line class="grid" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y(v) + '" y2="' + y(v) + '"/>';
+    s += '<text class="axis" x="' + (padL - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + v + '</text>';
+  }
+  res.bands.forEach((b, i) => {
+    const cx = padL + cw * i + cw / 2, bw = cw * 0.56;
+    const d = clamp(b.d, 0, ymax);
+    const cls = !b.valid ? 'bar invalid' : b.lower ? 'bar lower' : 'bar';
+    const top = b.valid ? y(d) : y(6);
+    s += '<rect class="' + cls + '" x="' + (cx - bw / 2) + '" y="' + top + '" width="' + bw + '" height="' + (y(0) - top) + '" rx="2"/>';
+    const label = !b.valid ? 'n/a' : (b.lower ? '≥' : '') + r0(b.d);
+    s += '<text class="val' + (b.valid ? '' : ' dim') + '" x="' + cx + '" y="' + (top - 6) + '" text-anchor="middle">' + label + '</text>';
+    s += '<text class="axis" x="' + cx + '" y="' + (H - 10) + '" text-anchor="middle">' + BAND_LABELS[i] + '</text>';
+  });
+  if (res.rating){
+    const pts = [125, 250, 500, 1000, 2000].map(f => {
+      const i = BANDS.indexOf(f);
+      return [padL + cw * i + cw / 2, y(REF_OCT[f] + res.rating.shift)];
+    });
+    s += '<polyline class="ref" points="' + pts.map(p => p.join(',')).join(' ') + '"/>';
+    const p5 = pts[2];
+    s += '<circle class="refdot" cx="' + p5[0] + '" cy="' + p5[1] + '" r="4"/>';
+  }
+  s += '</svg>';
+  return s;
+}
+
+function renderWall(){
+  $('#wt-path').innerHTML = Object.keys(PATHS).map(k => '<button type="button" class="chip" role="radio" data-path="' + k + '" aria-checked="' + (state.wall.path === k) + '">' + PATHS[k].label + '</button>').join('');
+  $('#wt-path-help').textContent = PATHS[state.wall.path].help;
+  $('#wt-echo').innerHTML = Object.keys(ECHO).map(k => '<button type="button" class="chip" role="radio" data-echo="' + k + '" aria-checked="' + (state.wall.echo === k) + '">' + ECHO[k].label + '</button>').join('');
+
+  const steps = state.wall.steps;
+  ['bg', 'src', 'rx'].forEach(k => {
+    const li = document.querySelector('.step[data-step="' + k + '"]');
+    li.classList.toggle('done', !!steps[k]);
+    if (!recording || recording.step !== k){
+      const st = li.querySelector('[data-status]');
+      if (steps[k]){
+        const lvl = r0(steps[k].a + state.offset);
+        let msg = 'Recorded' + (steps[k].src === 'file' ? ' from file' : '') + ' · about ' + lvl + ' dB(A). Record again to replace it.';
+        let cls = 'step-status small ok';
+        if (k === 'src' && steps.bg){
+          const weak = BANDS.filter((f, i) => steps.src.bands[i] - steps.bg.bands[i] < 10).length;
+          if (weak >= 3){ msg = 'The test noise is barely louder than the background. Turn it up or move the speaker closer, then record again.'; cls = 'step-status small warn'; }
+        }
+        st.textContent = msg; st.className = cls;
+      } else { st.textContent = ''; st.className = 'step-status small'; }
+      li.querySelector('[data-rec]').textContent = steps[k] ? 'Record again' : 'Record 10 s';
+    }
+  });
+
+  const w = currentWall(), res = w.res, kind = PATHS[state.wall.path].kind;
+  $('#wt-example').hidden = w.real;
+  $('#wt-clear').hidden = !(steps.bg || steps.src || steps.rx);
+  const numEl = $('#wt-num');
+  if (w.value == null){
+    numEl.textContent = '–';
+    $('#wt-label').textContent = 'Not enough signal';
+    $('#wt-sub').textContent = 'The test noise needs to be at least 10 dB louder than the background in three or more bands.';
+    $('#wt-text').textContent = '';
+  } else {
+    numEl.textContent = (res.rating.lowerBound ? '≥' : '') + w.value;
+    $('#wt-label').textContent = kind === 'door' ? 'Door and hallway isolation' : 'Sound isolation';
+    $('#wt-sub').textContent = 'On the same scale as field STC, adjusted to a furnished room. Higher is better.' + (w.real ? '' : ' Example data until you finish all three steps.');
+    $('#wt-text').textContent = kind === 'door' ? doorText(w.value)
+      : kind === 'interior' ? 'Interior walls usually measure 30 to 38. Use this to compare rooms, not to judge neighbor noise.'
+      : stcText(w.value);
+  }
+  $('#wt-chart').innerHTML = chartSVG(res);
+
+  if (kind === 'wall' && w.value != null){
+    $('#wt-hear').hidden = false;
+    $('#wt-hear').innerHTML = hearHTML(w.value - 2, w.value + 2, 'With this wall, you would hear');
+  } else { $('#wt-hear').hidden = true; $('#wt-hear').innerHTML = ''; }
+
+  const notes = [];
+  if (res.swapped) notes.push(['bad', 'The quiet side measured louder than the loud side. Check that steps 2 and 3 were recorded on the right sides.']);
+  else if (res.tooClose) notes.push(['warn', 'The two sides measured almost the same. Make sure step 3 was on the other side of the wall, with the door closed.']);
+  const missing = res.bands.filter(b => !b.valid && b.f <= 2000).map(b => BAND_LABELS[BANDS.indexOf(b.f)] + ' Hz');
+  if (missing.length) notes.push(['warn', 'Not enough test noise at ' + missing.join(', ') + '. A Bluetooth speaker reaches lower frequencies than a phone speaker.']);
+  if (res.rating && res.rating.lowerBound) notes.push(['info', 'Some bands were close to the background noise on the quiet side, so the wall is at least this good and may be better.']);
+  if (res.rating && res.rating.missingLow) notes.push(['warn', 'The 125 Hz band wasn\'t measured, so the result may be optimistic for bass and loud music.']);
+  if (res.rating) notes.push(['info', 'Overall the test noise dropped by ' + (res.aLower ? 'at least ' : '') + r0(res.aDrop) + ' dB(A) from one side to the other.']);
+  if (state.wall.path === 'neighbor' && w.real && w.value != null) notes.push(['good', 'This result is used for the neighbor walls on the Estimate tab.']);
+  $('#wt-notes').innerHTML = notesHTML(notes);
+}
+
+// ---------------------------------------------------------------- noise tab
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function drawTrace(levels, totalFrames, L90){
+  const c = $('#nm-canvas');
+  const dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth || 320, h = 160;
+  c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+  const g = c.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  const ymin = 20, ymax = 80, padL = 30, padR = 8, padT = 8, padB = 8;
+  const y = v => padT + (1 - (clamp(v, ymin, ymax) - ymin) / (ymax - ymin)) * (h - padT - padB);
+  g.font = '10px ' + (cssVar('--font-mono') || 'monospace');
+  g.lineWidth = 1;
+  for (let v = 30; v <= 70; v += 10){
+    g.strokeStyle = cssVar('--line');
+    g.beginPath(); g.moveTo(padL, Math.round(y(v)) + .5); g.lineTo(w - padR, Math.round(y(v)) + .5); g.stroke();
+    g.fillStyle = cssVar('--muted');
+    g.fillText(String(v), 6, y(v) + 3.5);
+  }
+  if (!levels.length) return;
+  const n = Math.max(totalFrames, levels.length, 2);
+  const x = i => padL + (i / (n - 1)) * (w - padL - padR);
+  g.beginPath(); g.moveTo(x(0), y(ymin));
+  levels.forEach((v, i) => g.lineTo(x(i), y(v)));
+  g.lineTo(x(levels.length - 1), y(ymin)); g.closePath();
+  g.fillStyle = cssVar('--accent-soft'); g.fill();
+  g.beginPath();
+  levels.forEach((v, i) => i ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v)));
+  g.strokeStyle = cssVar('--accent'); g.lineWidth = 1.5; g.lineJoin = 'round'; g.stroke();
+  if (L90 != null){
+    g.setLineDash([5, 4]); g.strokeStyle = cssVar('--ink'); g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(padL, y(L90)); g.lineTo(w - padR, y(L90)); g.stroke(); g.setLineDash([]);
+    g.fillStyle = cssVar('--ink'); g.fillText('L90 background', padL + 6, y(L90) + 13);
+  }
+}
+
+function bgText(st){
+  const l = st.L90;
+  let t;
+  if (l < 30) t = 'Very quiet, within the WHO night-time guideline for bedrooms (30 dB(A)). Readings this low are near what a phone microphone can measure. Neighbor sounds will stand out clearly against it.';
+  else if (l < 35) t = 'Quiet. Fine for most sleepers, but neighbor sounds will stand out against it.';
+  else if (l < 40) t = 'Some background noise. It masks quieter neighbor sounds but can bother light sleepers.';
+  else if (l < 45) t = 'Noisy for a bedroom. Expect traffic or building equipment to be noticeable at night.';
+  else t = 'Loud for a bedroom. Find out what the source is before signing.';
+  if (st.events > 0) t += ' ' + st.events + (st.events === 1 ? ' noise event' : ' noise events') + ' rose 10 dB or more above the background; sudden sounds like these are what wake people up.';
+  t += ' Daytime readings are usually louder than nights, but neighbors are often out during the day.';
+  return t;
+}
+
+function renderNoise(live){
+  const d = noiseData(), real = noiseReal();
+  $('#nm-example').hidden = real;
+  $('#nm-cal-chip').textContent = state.calibrated ? 'Calibrated' : 'Uncalibrated';
+  $('#nm-cal-chip').className = 'pill ' + (state.calibrated ? 'tone-good' : 'tone-warn');
+  $('#nm-dur').innerHTML = [[30, '30 s'], [60, '1 min'], [120, '2 min']].map(([v, l]) => '<button type="button" class="chip" role="radio" data-dur="' + v + '" aria-checked="' + (state.meterDur === v) + '">' + l + '</button>').join('');
+  if (live) return;
+  const levels = d.raw.map(v => v + state.offset);
+  const st = noiseStats(levels, FRAME_SEC);
+  $('#nm-now').textContent = r0(st.Leq);
+  $('#st-l90').textContent = r0(st.L90);
+  $('#st-leq').textContent = r0(st.Leq);
+  $('#st-max').textContent = r0(st.Lmax);
+  $('#st-ev').textContent = st.events;
+  $('#nm-text').textContent = (real ? '' : 'Example reading. ') + bgText(st);
+  drawTrace(levels, levels.length, st.L90);
+  const disp = d.bands.map(v => v + state.offset);
+  $('#nm-bands').innerHTML = '<div class="eyebrow">Octave bands, unweighted</div>' + disp.map((v, i) =>
+    '<div class="bandrow"><span>' + BAND_LABELS[i] + ' Hz</span><span class="track"><i style="width:' + clamp((v - 10) / 70 * 100, 2, 100).toFixed(1) + '%"></i></span><b>' + r0(v) + ' dB</b></div>').join('');
+  const lf = disp[0] - disp[3];
+  $('#nm-lf').hidden = !(lf > 15);
+  $('#nm-lf').textContent = 'Strong low-frequency hum or rumble, typically traffic, ventilation or machinery. Phones under-read bass, so it is likely louder than shown.';
+}
+
+// ---------------------------------------------------------------- visits tab
+function summary(){
+  const est = estimate(state.answers, measuredNeighbor());
+  const w = wallReady() ? currentWall() : null;
+  const ns = noiseReal() ? currentNoiseStats() : null;
+  return {
+    score: est.score, verdict: est.verdict, wall: est.wall, floor: est.floor,
+    wallTest: w && w.value != null ? { value: w.value, lower: w.res.rating.lowerBound, path: state.wall.path } : null,
+    noise: ns ? { L90: r0(ns.L90), Leq: r0(ns.Leq), Lmax: r0(ns.Lmax), events: ns.events } : null,
+    example: state.answersExample
+  };
+}
+function kvHTML(s){
+  const item = (k, v) => '<div><dt>' + k + '</dt><dd>' + v + '</dd></div>';
+  return item('Quiet score', s.score + ' <small>' + esc(s.verdict.label) + '</small>') +
+    item('Walls, estimated', 'STC ' + s.wall[0] + '–' + s.wall[1]) +
+    item('Floor, estimated', s.floor ? 'IIC ' + s.floor[0] + '–' + s.floor[1] : 'Top floor') +
+    item('Wall test', s.wallTest ? (s.wallTest.lower ? '≥' : '') + s.wallTest.value + ' <small>' + esc(PATHS[s.wallTest.path] ? PATHS[s.wallTest.path].label : '') + '</small>' : '<small>Not measured</small>') +
+    item('Room noise', s.noise ? s.noise.L90 + ' dB(A) <small>background, ' + s.noise.events + ' events</small>' : '<small>Not measured</small>');
+}
+function renderVisits(){
+  $('#v-name').value = state.visit.name;
+  $('#v-notes').value = state.visit.notes;
+  const s = summary();
+  $('#v-current').innerHTML = kvHTML(s) + (s.example ? '<div><dt>Note</dt><dd><small>Answers are still the example. Update them on the Estimate tab.</small></dd></div>' : '');
+  const list = state.visits.slice().reverse();
+  $('#v-count').textContent = list.length ? list.length + (list.length === 1 ? ' visit' : ' visits') : '';
+  $('#v-list').innerHTML = list.length ? list.map(v => {
+    const date = new Date(v.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return '<div class="visit"><div class="visit-head"><div><div class="visit-name">' + esc(v.name) + '</div><div class="eyebrow">' + esc(date) + '</div></div>' +
+      '<div class="visit-score">' + v.score + '<small>/100</small></div></div>' +
+      '<dl class="kv">' + kvHTML(v) + '</dl>' +
+      (v.notes ? '<p class="visit-notes">' + esc(v.notes) + '</p>' : '') +
+      '<div class="actions" data-row="' + v.id + '"><button type="button" class="linkbtn" data-del="' + v.id + '">Delete</button></div></div>';
+  }).join('') : '<p class="empty">No saved visits yet. Fill in the Estimate tab, take measurements, then save the visit here to compare apartments.</p>';
+}
+
+// ---------------------------------------------------------------- tips tab
+const CHECKS = [
+  ['time', 'Visit in the evening or on a weekend, when neighbors are home. Weekday daytime tours hide most neighbor noise.'],
+  ['ask-build', 'Ask what the building is made of, and whether walls and floors were tested for sound. STC and IIC of 50 or more is the US code minimum for new buildings.'],
+  ['ask-rugs', 'Ask whether the lease requires rugs over hard floors. It shows management takes footstep noise seriously.'],
+  ['plan', 'Check the floor plan: what is on the other side of the bedroom wall? A neighbor\'s bedroom or closet is better than their living room or kitchen.'],
+  ['knock', 'Knock on shared walls and the ceiling, and compare with an interior wall.'],
+  ['listen', 'Stand in the bedroom with the windows closed and listen in silence for two minutes. Run the room noise meter while you do.'],
+  ['outlets', 'Look at outlets and switches on shared walls. Outlets back to back with the neighbor\'s leak sound.'],
+  ['door', 'Check the entry door. Light under the door means hallway noise gets in too.'],
+  ['locate', 'Find the elevator, trash chute, stairwell, laundry and mechanical rooms relative to the bedroom.'],
+  ['windows', 'Check the windows: double-pane, closing tightly, and which side faces the street.'],
+  ['hvac', 'Turn on the heating and cooling. Through-wall units are loud and let in outside noise.'],
+  ['reviews', 'Search reviews of the building for "thin walls", "footsteps" and "hear neighbors".'],
+  ['tenants', 'If you meet residents in the hallway, ask them how noisy it is.']
+];
+function renderTips(){
+  $('#checklist').innerHTML = CHECKS.map(([id, text]) => '<li><label><input type="checkbox" data-check="' + id + '"' + (state.checks[id] ? ' checked' : '') + '><span>' + esc(text) + '</span></label></li>').join('');
+  const stcRows = [[34, '< 35'], [37, '35–39'], [42, '40–44'], [47, '45–49'], [52, '50–54'], [57, '55–59'], [62, '60+']];
+  $('#stc-table').innerHTML = stcRows.map(([v, l]) => '<tr><td class="num">' + l + '</td><td>' + stcText(v) + '</td></tr>').join('');
+  const iicRows = [[35, '< 40'], [45, '40–49'], [52, '50–54'], [60, '55–64'], [68, '65+']];
+  $('#iic-table').innerHTML = iicRows.map(([v, l]) => '<tr><td class="num">' + l + '</td><td>' + iicText(v) + '</td></tr>').join('');
+}
+
+// ---------------------------------------------------------------- audio
+let actx = null;
+function audioCtx(){
+  if (!actx){ const C = window.AudioContext || window.webkitAudioContext; actx = new C(); }
+  return actx;
+}
+const analyzers = {};
+function getAnalyzer(sr){ return analyzers[sr] || (analyzers[sr] = makeAnalyzer(sr)); }
+
+let wakeHolds = 0, wakeSentinel = null;
+async function wake(on){
+  wakeHolds = Math.max(0, wakeHolds + (on ? 1 : -1));
+  try {
+    if (wakeHolds > 0 && !wakeSentinel && navigator.wakeLock) wakeSentinel = await navigator.wakeLock.request('screen');
+    else if (wakeHolds === 0 && wakeSentinel){ const s = wakeSentinel; wakeSentinel = null; await s.release(); }
+  } catch (e) { wakeSentinel = null; }
+}
+function setSession(type){ try { if (navigator.audioSession) navigator.audioSession.type = type; } catch (e) {} }
+
+let pinkBuf = null, noisePlayer = null;
+function makePink(ctx){
+  const sr = ctx.sampleRate, len = sr * 10, fade = Math.round(sr * 0.05);
+  const tmp = new Float32Array(len + fade);
+  let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, peak = 0;
+  for (let i = 0; i < tmp.length; i++){
+    const wn = Math.random() * 2 - 1;
+    b0 = 0.99886 * b0 + wn * 0.0555179; b1 = 0.99332 * b1 + wn * 0.0750759; b2 = 0.96900 * b2 + wn * 0.1538520;
+    b3 = 0.86650 * b3 + wn * 0.3104856; b4 = 0.55000 * b4 + wn * 0.5329522; b5 = -0.7616 * b5 - wn * 0.0168980;
+    tmp[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + wn * 0.5362; b6 = wn * 0.115926;
+    peak = Math.max(peak, Math.abs(tmp[i]));
+  }
+  const buf = ctx.createBuffer(1, len, sr), d = buf.getChannelData(0), k = 1.8, norm = Math.tanh(k);
+  for (let i = 0; i < len; i++){
+    let v = tmp[i];
+    if (i < fade){ const t = i / fade; v = v * t + tmp[len + i] * (1 - t); }
+    d[i] = Math.tanh(k * v / peak) / norm * 0.98;
+  }
+  return buf;
+}
+function toggleNoise(){
+  const btn = $('#tn-play');
+  if (noisePlayer){
+    try { noisePlayer.src.stop(); } catch (e) {}
+    noisePlayer = null; btn.textContent = 'Play noise'; btn.classList.remove('recording');
+    wake(false);
+    return;
+  }
+  if (!recording) setSession('playback');
+  const ctx = audioCtx();
+  if (ctx.state !== 'running') ctx.resume();
+  if (!pinkBuf || pinkBuf.sampleRate !== ctx.sampleRate) pinkBuf = makePink(ctx);
+  const src = ctx.createBufferSource(); src.buffer = pinkBuf; src.loop = true;
+  const g = ctx.createGain(); g.gain.value = Math.pow(+$('#tn-vol').value / 100, 2);
+  src.connect(g); g.connect(ctx.destination); src.start();
+  noisePlayer = { src, g };
+  btn.textContent = 'Stop noise'; btn.classList.add('recording');
+  wake(true);
+}
+
+function micBlockedByPolicy(){
+  if (!window.isSecureContext) return true;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return true;
+  try {
+    const p = document.permissionsPolicy || document.featurePolicy;
+    if (p && typeof p.allowsFeature === 'function') return !p.allowsFeature('microphone');
+  } catch (e) {}
+  return false;
+}
+function showMicBanner(){
+  $('#mic-banner').hidden = false;
+  if (FULL_URL){ $('#full-link').href = FULL_URL; $('#mic-banner-link').hidden = false; }
+}
+
+async function openMic(){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ const e = new Error('unsupported'); e.name = 'NotSupportedError'; throw e; }
+  setSession('play-and-record');
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 }, video: false });
+  const ctx = audioCtx();
+  if (ctx.state !== 'running') await ctx.resume();
+  const src = ctx.createMediaStreamSource(stream);
+  const an = ctx.createAnalyser(); an.fftSize = FFT_N; an.smoothingTimeConstant = 0;
+  const sink = ctx.createGain(); sink.gain.value = 0;
+  src.connect(an); an.connect(sink); sink.connect(ctx.destination);
+  return { stream, src, an, sink, buf: new Float32Array(FFT_N), analyze: getAnalyzer(ctx.sampleRate) };
+}
+function closeMic(m){
+  try { m.src.disconnect(); m.an.disconnect(); m.sink.disconnect(); } catch (e) {}
+  m.stream.getTracks().forEach(t => t.stop());
+}
+
+let recording = null; // { step, cancel }
+function record(seconds, onFrame){
+  let cancelled = false;
+  const promise = (async () => {
+    const m = await openMic();
+    wake(true);
+    const frames = [];
+    try {
+      let skip = 4;
+      const t0 = performance.now();
+      await new Promise(resolve => {
+        const timer = setInterval(() => {
+          if (cancelled){ clearInterval(timer); resolve(); return; }
+          m.an.getFloatTimeDomainData(m.buf);
+          if (skip > 0){ skip--; return; }
+          const fr = m.analyze(m.buf);
+          frames.push(fr);
+          const el = (performance.now() - t0) / 1000;
+          if (onFrame) onFrame(fr, Math.min(1, el / seconds), frames);
+          if (el >= seconds + 0.4){ clearInterval(timer); resolve(); }
+        }, 100);
+      });
+    } finally {
+      closeMic(m);
+      wake(false);
+      if (noisePlayer) setSession('playback');
+    }
+    if (frames.length && frames.every(f => f.a === 0)){ const e = new Error('silent'); e.name = 'Silent'; throw e; }
+    return frames;
+  })();
+  return { promise, cancel(){ cancelled = true; } };
+}
+
+async function framesFromFile(file){
+  const ctx = audioCtx();
+  const data = await file.arrayBuffer();
+  const audio = await new Promise((res, rej) => {
+    const p = ctx.decodeAudioData(data, res, rej);
+    if (p && p.catch) p.catch(rej);
+  });
+  let ch = audio.getChannelData(0);
+  if (audio.numberOfChannels > 1){
+    const r = audio.getChannelData(1), mix = new Float32Array(ch.length);
+    for (let i = 0; i < ch.length; i++) mix[i] = (ch[i] + r[i]) / 2;
+    ch = mix;
+  }
+  const sr = audio.sampleRate, analyze = getAnalyzer(sr), hop = Math.round(sr * FRAME_SEC);
+  const trim = audio.duration > 6 ? Math.round(sr) : 0;
+  const frames = [];
+  for (let s = trim; s + FFT_N <= ch.length - trim; s += hop) frames.push(analyze(ch.subarray(s, s + FFT_N)));
+  if (frames.length < 10){ const e = new Error('short'); e.name = 'TooShort'; throw e; }
+  return frames;
+}
+
+function micErrorText(err){
+  const n = err && err.name;
+  if (n === 'NotAllowedError' || n === 'SecurityError' || n === 'NotSupportedError'){
+    showMicBanner();
+    return 'The microphone is blocked here. Allow microphone access in your browser settings, or use a recording instead.';
+  }
+  if (n === 'NotFoundError') return 'No microphone was found on this device.';
+  if (n === 'Silent') return 'The microphone returned silence. Close other apps using it and try again.';
+  if (n === 'TooShort') return 'That recording is too short. Record at least 5 seconds.';
+  if (n === 'EncodingError') return 'That file couldn\'t be read as audio. Try an .m4a, .mp3 or .wav file.';
+  return 'Something went wrong: ' + (err && err.message ? err.message : 'unknown error') + '.';
+}
+
+// ---------------------------------------------------------------- wall test actions
+function stepFinished(k, frames, src){
+  const avg = averageFrames(frames);
+  state.wall.steps[k] = { a: +avg.a.toFixed(2), bands: avg.bands.map(v => +v.toFixed(2)), src, at: Date.now() };
+  persist();
+  renderWall(); renderEstimate();
+}
+function startStep(k){
+  if (recording){
+    if (recording.step === k) recording.cancel();
+    return;
+  }
+  const li = document.querySelector('.step[data-step="' + k + '"]');
+  const btn = li.querySelector('[data-rec]'), prog = li.querySelector('[data-prog]'), bar = prog.firstElementChild, st = li.querySelector('[data-status]');
+  btn.textContent = 'Stop'; btn.classList.add('recording');
+  prog.hidden = false; bar.style.width = '0%';
+  st.className = 'step-status small'; st.textContent = 'Starting the microphone…';
+  const run = record(10, (fr, p) => {
+    bar.style.width = (p * 100).toFixed(1) + '%';
+    st.textContent = 'Recording · ' + r0(toDb(fr.a) + state.offset) + ' dB(A) now';
+  });
+  recording = { step: k, cancel: run.cancel };
+  run.promise.then(frames => {
+    recording = null;
+    if (frames.length >= 30) stepFinished(k, frames, 'mic');
+    else { st.className = 'step-status small warn'; st.textContent = 'Stopped early. Record the full 10 seconds.'; }
+  }).catch(err => {
+    recording = null;
+    st.className = 'step-status small bad'; st.textContent = micErrorText(err);
+  }).finally(() => {
+    btn.classList.remove('recording');
+    btn.textContent = state.wall.steps[k] ? 'Record again' : 'Record 10 s';
+    prog.hidden = true;
+    if (!st.classList.contains('bad') && !st.classList.contains('warn')) renderWall();
+  });
+}
+async function stepFromFile(k, file){
+  const st = document.querySelector('[data-status="' + k + '"]');
+  st.className = 'step-status small'; st.textContent = 'Reading the recording…';
+  try { stepFinished(k, await framesFromFile(file), 'file'); }
+  catch (err) { st.className = 'step-status small bad'; st.textContent = micErrorText(err); }
+}
+
+// ---------------------------------------------------------------- noise meter actions
+let meterRun = null;
+function finishNoise(frames, src){
+  const avg = averageFrames(frames);
+  state.noise = { raw: frames.map(f => +toDb(f.a).toFixed(2)), bands: avg.bands.map(v => +v.toFixed(2)), at: Date.now(), src };
+  if (!state.bgModeChosen) state.bgMode = 'measured';
+  persist();
+  renderNoise(); renderEstimate(); renderWall();
+}
+function toggleMeter(){
+  const btn = $('#nm-start');
+  if (meterRun){ meterRun.cancel(); return; }
+  if (recording){ toast('Finish the wall test recording first'); return; }
+  const secs = state.meterDur, total = secs * 10, live = [];
+  btn.textContent = 'Stop'; btn.classList.add('recording');
+  $('#nm-example').hidden = true;
+  $('#nm-text').textContent = 'Starting the microphone…';
+  ['#st-l90', '#st-leq', '#st-max', '#st-ev'].forEach(s => { $(s).textContent = '–'; });
+  meterRun = record(secs, (fr) => {
+    const v = toDb(fr.a) + state.offset;
+    live.push(v);
+    $('#nm-now').textContent = r0(v);
+    if (live.length % 2 === 0 || live.length < 3){
+      drawTrace(live, total, null);
+      const st = noiseStats(live, FRAME_SEC);
+      $('#st-l90').textContent = r0(st.L90); $('#st-leq').textContent = r0(st.Leq); $('#st-max').textContent = r0(st.Lmax); $('#st-ev').textContent = st.events;
+      $('#nm-text').textContent = 'Recording · ' + Math.round(live.length / 10) + ' of ' + secs + ' s. Stay quiet.';
+    }
+  });
+  meterRun.promise.then(frames => {
+    if (frames.length >= 20) finishNoise(frames, 'mic');
+    else { renderNoise(); $('#nm-text').textContent = 'Stopped too early to measure. Record at least a few seconds.'; }
+  }).catch(err => {
+    renderNoise();
+    $('#nm-text').textContent = micErrorText(err);
+  }).finally(() => {
+    meterRun = null;
+    btn.textContent = 'Start'; btn.classList.remove('recording');
+  });
+}
+async function noiseFromFile(file){
+  $('#nm-text').textContent = 'Reading the recording…';
+  try { finishNoise(await framesFromFile(file), 'file'); }
+  catch (err) { renderNoise(); $('#nm-text').textContent = micErrorText(err); }
+}
+function calibrate(){
+  const ref = parseFloat($('#cal-ref').value);
+  const st = $('#cal-status');
+  if (!isFinite(ref) || ref < 20 || ref > 120){ st.textContent = 'Enter the trusted meter\'s reading first, between 20 and 120 dB(A).'; return; }
+  if (recording || meterRun){ st.textContent = 'Finish the current recording first.'; return; }
+  const btn = $('#cal-measure');
+  btn.disabled = true; st.textContent = 'Measuring for 5 seconds…';
+  const run = record(5, null);
+  recording = { step: 'cal', cancel: run.cancel };
+  run.promise.then(frames => {
+    const raw = averageFrames(frames).a;
+    state.offset = +(ref - raw).toFixed(1);
+    state.calibrated = true;
+    persist();
+    $('#cal-offset').value = state.offset;
+    st.textContent = 'Calibrated. Offset set to ' + state.offset + ' dB.';
+    renderNoise(); renderEstimate(); renderWall();
+  }).catch(err => { st.textContent = micErrorText(err); })
+    .finally(() => { recording = null; btn.disabled = false; });
+}
+
+// ---------------------------------------------------------------- tabs, toast, events
+function showTab(name){
+  if (!document.getElementById('tab-' + name)) name = 'estimate';
+  state.tab = name; persist();
+  $$('.tab').forEach(s => { s.hidden = s.id !== 'tab-' + name; });
+  $$('.tabbtn').forEach(b => { if (b.dataset.tab === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  if (name === 'noise') renderNoise();
+  if (name === 'visits') renderVisits();
+  if (name !== 'estimate') $('#est-mini').classList.remove('show');
+  window.scrollTo(0, 0);
+}
+let toastTimer = null;
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('button');
+  if (!t) return;
+  if (t.dataset.tab){ showTab(t.dataset.tab); return; }
+  if (t.dataset.v && t.closest('[data-q]')){
+    const group = t.closest('[data-q]'), q = group.dataset.q;
+    if (group.hasAttribute('data-multi')){
+      const cur = new Set(state.answers[q] || []);
+      cur.has(t.dataset.v) ? cur.delete(t.dataset.v) : cur.add(t.dataset.v);
+      state.answers[q] = Array.from(cur);
+    } else state.answers[q] = t.dataset.v;
+    state.answersExample = false;
+    persist(); renderEstimate();
+    return;
+  }
+  if (t.dataset.bg){
+    state.bgMode = t.dataset.bg; state.bgModeChosen = true;
+    persist(); renderEstimate(); renderWall();
+    return;
+  }
+  if (t.dataset.path){ state.wall.path = t.dataset.path; persist(); renderWall(); renderEstimate(); return; }
+  if (t.dataset.echo){ state.wall.echo = t.dataset.echo; persist(); renderWall(); renderEstimate(); return; }
+  if (t.dataset.rec){ if (meterRun){ toast('Stop the room noise meter first'); return; } startStep(t.dataset.rec); return; }
+  if (t.dataset.dur){ if (!meterRun){ state.meterDur = +t.dataset.dur; persist(); renderNoise(true); } return; }
+  if (t.dataset.del){
+    const row = t.parentElement;
+    row.innerHTML = '<span class="small">Delete this visit?</span><button type="button" class="btn danger" data-del-yes="' + t.dataset.del + '">Delete</button><button type="button" class="linkbtn" data-del-no="1">Cancel</button>';
+    return;
+  }
+  if (t.dataset.delYes){
+    state.visits = state.visits.filter(v => String(v.id) !== t.dataset.delYes);
+    persist(); renderVisits(); toast('Visit deleted');
+    return;
+  }
+  if (t.dataset.delNo){ renderVisits(); return; }
+  switch (t.id){
+    case 'tn-play': toggleNoise(); break;
+    case 'nm-start': toggleMeter(); break;
+    case 'nm-cal-chip': $('#cal').open = true; $('#cal').scrollIntoView({ behavior: 'smooth', block: 'start' }); break;
+    case 'cal-measure': calibrate(); break;
+    case 'cal-reset':
+      state.offset = DEFAULT_OFFSET; state.calibrated = false; persist();
+      $('#cal-offset').value = state.offset; $('#cal-status').textContent = 'Offset reset to the default.';
+      renderNoise(); renderEstimate(); renderWall();
+      break;
+    case 'wt-clear':
+      state.wall.steps = { bg: null, src: null, rx: null }; persist(); renderWall(); renderEstimate();
+      break;
+    case 'v-save': {
+      const s = summary();
+      const name = state.visit.name.trim() || 'Visit ' + (state.visits.length + 1);
+      state.visits.push(Object.assign({ id: Date.now(), name, notes: state.visit.notes.trim(), date: Date.now() }, s));
+      persist(); renderVisits(); toast('Visit saved');
+      break;
+    }
+    case 'v-new': $('#v-new-confirm').hidden = false; break;
+    case 'v-new-no': $('#v-new-confirm').hidden = true; break;
+    case 'v-new-yes':
+      state.answers = Object.assign({}, BLANK_ANSWERS); state.answersExample = false;
+      state.wall.steps = { bg: null, src: null, rx: null }; state.noise = null;
+      state.visit = { name: '', notes: '' };
+      persist();
+      $('#v-new-confirm').hidden = true;
+      renderEstimate(); renderWall(); renderNoise(); renderVisits();
+      toast('Ready for the next apartment');
+      break;
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset && t.dataset.file && t.files && t.files[0]){ stepFromFile(t.dataset.file, t.files[0]); t.value = ''; }
+  else if (t.id === 'f-noise' && t.files && t.files[0]){ noiseFromFile(t.files[0]); t.value = ''; }
+  else if (t.dataset && t.dataset.check){ state.checks[t.dataset.check] = t.checked; persist(); }
+  else if (t.id === 'cal-offset'){
+    const v = parseFloat(t.value);
+    if (isFinite(v)){ state.offset = v; state.calibrated = true; persist(); renderNoise(); renderEstimate(); renderWall(); }
+  }
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.id === 'v-name'){ state.visit.name = t.value; persist(); }
+  else if (t.id === 'v-notes'){ state.visit.notes = t.value; persist(); }
+  else if (t.id === 'tn-vol' && noisePlayer){ noisePlayer.g.gain.value = Math.pow(+t.value / 100, 2); }
+});
+
+// sticky mini summary on the estimate tab
+if ('IntersectionObserver' in window){
+  new IntersectionObserver(entries => {
+    const vis = entries[0].isIntersecting;
+    $('#est-mini').classList.toggle('show', !vis && state.tab === 'estimate');
+  }, { threshold: 0 }).observe($('#est-result'));
+}
+// redraw canvas on theme or size changes
+const redraw = () => { if (state.tab === 'noise' && !meterRun) renderNoise(); };
+try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redraw); } catch (e) {}
+new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+let rz = null;
+window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(redraw, 150); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && meterRun) meterRun.cancel(); });
+
+// ---------------------------------------------------------------- init
+renderQuestions();
+renderTips();
+$('#cal-offset').value = state.offset;
+if (micBlockedByPolicy()) showMicBanner();
+renderEstimate();
+renderWall();
+renderNoise();
+renderVisits();
+const hash = (location.hash || '').replace('#', '');
+showTab(['estimate', 'wall', 'noise', 'visits', 'tips'].includes(hash) ? hash : state.tab);
+})();
+</script>
+
+</body>
+</html>
